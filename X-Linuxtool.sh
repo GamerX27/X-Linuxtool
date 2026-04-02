@@ -1,10 +1,11 @@
 #!/bin/bash
-
 echo "Choose a script to download and run:"
 echo "1) Fedora Desktop"
 echo "2) HomeLab"
 echo "3) Brave Debloat"
-read -p "Enter your choice (1, 2, or 3): " choice
+echo "4) Kron4ek Wine Installer" 
+echo "5) Proton CachyOS Installer"
+read -p "Enter your choice (1, 2, 3, 4, or 5): " choice
 
 case $choice in
     1)
@@ -25,8 +26,22 @@ case $choice in
         echo "Downloading and running Brave Debloat..."
         curl -sSL https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/commit/3f97124547ce8eef805d34024579f7b047397afe/Browser/make_brave_great_again.sh -o /tmp/make_brave_great_again.sh
         chmod +x /tmp/make_brave_great_again.sh
-        /tmp/make_brave_great_again.sh
+        /tmp/make_brave_Great_again.sh
         rm -f /tmp/make_brave_great_again.sh
+        ;;
+    4)  
+        echo "Downloading and running Kron4ek Wine Installer..."
+        curl -sSL https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Gaming/Kron4ek-wine-installer.sh -o /tmp/Kron4ek-wine-installer.sh
+        chmod +x /tmp/Kron4ek-wine-installer.sh
+        /tmp/Kron4ek-wine-installer.sh
+        rm -f /tmp/Kron4ek-wine-installer.sh
+        ;;
+    5)  
+        echo "Downloading and running Proton CachyOS Installer..."
+        curl -sSL https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Gaming/proton-cachyos-installer.sh -o /tmp/proton-cachyos-installer.sh
+        chmod +x /tmp/proton-cachyos-installer.sh
+        /tmp/proton-cachyos-installer.sh
+        rm -f /tmp/proton-cachyos-installer.sh
         ;;
     *)
         echo "Invalid choice. Exiting."
