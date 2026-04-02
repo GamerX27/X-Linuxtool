@@ -7,7 +7,11 @@ flatpak remote-modify --disable fedora
 
 
 #Apps
-flatpak remove --noninteractive --assumeyes  org.kde.elisa org.kde.kmahjongg org.kde.kolourpaint org.kde.kmines org.kde.kolourpaint
+for app in org.kde.elisa org.kde.kmahjongg org.kde.kolourpaint org.kde.kmines; do
+if flatpak list --app | grep -q "Sapp"; then
+flatpak remove -y "Sapp"
+fi
+done
 
 flatpak -y install flathub com.brave.Browser org.videolan.VLC org.jellyfin.JellyfinDesktop org.localsend.localsend_app io.github.kolunmi.Bazaar com.unicornsonlsd.finamp 
 
