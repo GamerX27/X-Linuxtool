@@ -109,7 +109,7 @@ fi
 curl -fsS https://dl.brave.com/install.sh | sh
 
 #make Brave less bloated disables AI, better privacy out of the box and makes Qwant based in europe the default search using policy.
-wget https://codeberg.org/X27/X-Linuxtools/raw/branch/main/Scripts/browser/Brave/make_brave_great_again.sh
+wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Browser/make_brave_great_again.sh
 sudo bash make_brave_great_again.sh
 sudo rm make_brave_great_again.sh
 
@@ -170,7 +170,7 @@ if [[ "$choice" =~ ^[Yy](es)?$ ]]; then
     echo "Downloading and running the Gaming Packages script..."
 
     # Download the script
-    wget -q --show-progress https://codeberg.org/X27/X-Linuxtools/raw/branch/main/Scripts/Gaming/Gaming.sh
+    wget -q --show-progress https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Gaming/Gaming.sh
 
     # Make the script executable
     chmod +x Gaming.sh
@@ -186,17 +186,11 @@ else
 fi
 
 #Flatpaks
-wget https://codeberg.org/X27/X-Linuxtools/raw/branch/main/Scripts/tools/flatpaks.sh
+wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Flatpak/flatpaks.sh
 
 bash flatpaks.sh
 
 rm flatpaks.sh
-
-#Fastfetch Config Credit to https://github.com/harilvfs.
-wget https://codeberg.org/X27/X-Linuxtools/raw/branch/main/Scripts/tools/fsfetch.sh
-sudo bash fsfetch.sh
-sudo rm fsfetch.sh
-
 
 
 #Turn off OpenSSH Server
