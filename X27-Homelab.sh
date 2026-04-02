@@ -17,4 +17,8 @@ case $choice in
         echo "Running Fedora-PostSetup.sh..."
         curl -sSL https://codeberg.org/X27/X27-Homelab-ToolBox/raw/branch/main/Servers/Server-Updater.sh | bash
         ;;
+    *)
+        echo "Invalid choice. Exiting."
+        exit 1
+        ;;
 esac
