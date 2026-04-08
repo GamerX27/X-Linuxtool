@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script to choose between Fedora-Minimal.sh and Fedora-PostSetup.sh
+
 echo "Choose a script to run:"
 echo "1) Fedora-Minimal"
 echo "2) Fedora-PostSetup"
