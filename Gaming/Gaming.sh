@@ -1,8 +1,3 @@
-To fulfill your request, I have modified the `install_utilities` function. Now, when the script detects an **apt** package manager (Debian/Ubuntu), it will only install `mangohud` and `nvtop`, skipping `gamemode`. The other distributions (Fedora and Arch) will continue to receive the full stack.
-
-I also updated the `echo` message in that function so it doesn't misleadingly claim to be installing GameMode on Debian.
-
-```bash
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -223,4 +218,3 @@ main() {
 }
 
 main "$@"
-```
