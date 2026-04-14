@@ -41,7 +41,7 @@ dnf install -y libavcodec-freeworld
 dnf group install -y multimedia
 
 # ==============================================================================
-# 5. HARDWARE ACCELERATION 
+# 5. HARDWARE ACCELERATION
 # ==============================================================================
 swap_amd() {
     echo "Swapping to AMD drivers..."
@@ -136,7 +136,7 @@ dnf install -y librewolf
 dnf install -y chromium torbrowser-launcher
 
 # ==============================================================================
-# 10. HOSTNAME SETUP 
+# 10. HOSTNAME SETUP
 # ==============================================================================
 echo ""
 read -p "Enter the new hostname for your Fedora system: " new_hostname < /dev/tty
@@ -151,7 +151,7 @@ else
 fi
 
 # ==============================================================================
-# 11. GAMING PACKAGES 
+# 11. GAMING PACKAGES
 # ==============================================================================
 echo ""
 read -p "Do you want to install Gaming Packages? (yes/no): " gaming_choice < /dev/tty
@@ -174,11 +174,26 @@ bash flatpaks.sh
 rm -f flatpaks.sh
 
 # ==============================================================================
-# 13. SECURITY & CLEANUP
+# 13. Set Locale to 24 Hour
+# ==============================================================================
+set_locale_time() {
+    echo "Attempting to set LC_TIME to C.UTF-8..."
+    if sudo localectl set-locale LC_TIME=C.UTF-8; then
+        echo "Successfully set LC_TIME."
+    else
+        echo "Error: Failed to set the locale time. Check if you have permission or if the command is correct." >&2
+        return 1
+    fi
+}
+
+set_locale_time
+
+# ==============================================================================
+# 14. SECURITY & CLEANUP
 # ==============================================================================
 echo "Securing system (Disabling OpenSSH)..."
 systemctl stop sshd
-systemctl disable sshd 
+systemctl disable sshd
 
 echo "Finalizing installation and cleaning up..."
 sleep 5
