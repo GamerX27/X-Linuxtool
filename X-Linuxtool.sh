@@ -1,4 +1,3 @@
-```sh /home/sindre/Documents/Code/Prosjekter/X-Linuxtool/X-Linuxtool.sh
 #!/bin/bash
 echo "Choose a script to download and run:"
 echo "1) Fedora Desktop"
