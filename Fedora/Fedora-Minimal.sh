@@ -34,7 +34,7 @@ systemctl set-default graphical.target
 echo "Installing RPM Fusion repositories..."
 dnf install -y \
 https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
-https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-notfree-release-$(rpm -E %fedora).noarch.rpm
 
 dnf update -y @core
 dnf install -y libavcodec-freeworld
@@ -96,7 +96,7 @@ flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flat
 echo "Configuring NetworkManager privacy settings..."
 mkdir -p /etc/NetworkManager/conf.d
 [[ -e /etc/NetworkManager/conf.d/20-connectivity-fedora.conf ]] && cp -n /etc/NetworkManager/conf.d/20-connectivity-fedora.conf /etc/NetworkManager/conf.d/20-connectivity-fedora.conf.bak
-printf "[connectivity]\nenabled=false\n" | tee /etc/NetworkManager/conf.d/20-connectivity-fedora.conf >/dev/null
+printf "[connectivity]\nenabled=false\n" | tee /etc/Network/Manager/conf.d/20-connectivity-fedora.conf >/dev/null
 systemctl restart NetworkManager
 
 if ! rpm -q NetworkManager-wifi >/dev/null 2>&1; then
@@ -105,28 +105,15 @@ if ! rpm -q NetworkManager-wifi >/dev/null 2>&1; then
 fi
 
 # ==============================================================================
-# 9. BROWSERS & DEV TOOLS
+# 9. BROWSERS
 # ==============================================================================
-echo "Installing Browsers and Dev Tools..."
+echo "Installing Browsers..."
 
 # Brave
 curl -fsS https://dl.brave.com/install.sh | sh
 wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Browser/make_brave_great_again.sh
 bash make_brave_great_again.sh
 rm -f make_brave_great_again.sh
-
-# VSCodium
-tee -a /etc/yum.repos.d/vscodium.repo << 'EOF'
-[gitlab.com_paulcarroty_vscodium_repo]
-name=gitlab.com_paulcarroty_vscodium_repo
-baseurl=https://paulcarroty.gitlab.io/vscodium-deb-rpm-repo/rpms/
-enabled=1
-gpgcheck=1
-repo_gpgcheck=1
-gpgkey=https://gitlab.com/paulcarroty/vscodium-deb-rpm-repo/raw/master/pub.gpg
-metadata_expire=1h
-EOF
-dnf install -y codium
 
 # Librewolf
 curl -fsSL https://repo.librewolf.net/librewolf.repo | tee /etc/yum.repos.d/librewolf.repo
@@ -136,7 +123,17 @@ dnf install -y librewolf
 dnf install -y chromium torbrowser-launcher
 
 # ==============================================================================
-# 10. HOSTNAME SETUP
+# 10. DEV TOOLS
+# ==============================================================================
+echo "Installing Dev Tools..."
+
+# Zed (Flatpak)
+flatpak install flathub dev.zed.Zed -y
+# Grant Zed access to ~/Documents/Code
+flatcap override --user --filesystem=xdg-documents/Code:create dev.zed.Zed
+
+# ==============================================================================
+# 11. HOSTNAME SETUP
 # ==============================================================================
 echo ""
 read -p "Enter the new hostname for your Fedora system: " new_hostname < /dev/tty
@@ -151,7 +148,7 @@ else
 fi
 
 # ==============================================================================
-# 11. GAMING PACKAGES
+# 12. GAMING PACKAGES
 # ==============================================================================
 echo ""
 read -p "Do you want to install Gaming Packages? (yes/no): " gaming_choice < /dev/tty
@@ -166,7 +163,7 @@ else
 fi
 
 # ==============================================================================
-# 12. FLATPAKS
+# 13. FLATPAKS
 # ==============================================================================
 echo "Installing Flatpak applications..."
 wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Flatpak/flatpaks.sh
@@ -174,7 +171,7 @@ bash flatpaks.sh
 rm -f flatpaks.sh
 
 # ==============================================================================
-# 13. Set Locale to 24 Hour
+# 14. Set Locale to 24 Hour
 # ==============================================================================
 set_locale_time() {
     echo "Attempting to set LC_TIME to C.UTF-8..."
@@ -189,7 +186,7 @@ set_locale_time() {
 set_locale_time
 
 # ==============================================================================
-# 14. SECURITY & CLEANUP
+# 15. SECURITY & CLEANUP
 # ==============================================================================
 echo "Securing system (Disabling OpenSSH)..."
 systemctl stop sshd
