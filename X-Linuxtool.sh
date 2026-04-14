@@ -1,11 +1,13 @@
+```sh /home/sindre/Documents/Code/Prosjekter/X-Linuxtool/X-Linuxtool.sh
 #!/bin/bash
 echo "Choose a script to download and run:"
 echo "1) Fedora Desktop"
 echo "2) HomeLab"
 echo "3) Brave Debloat"
-echo "4) Kron4ek Wine Installer" 
+echo "4) Kron4ek Wine Installer"
 echo "5) Proton CachyOS Installer"
-read -p "Enter your choice (1, 2, 3, 4, or 5): " choice
+echo "6) Gigabyte Sleep Fix"
+read -p "Enter your choice (1, 2, 3, 4, 5, or 6): " choice
 
 case $choice in
     1)
@@ -29,19 +31,26 @@ case $choice in
         /tmp/make_brave_Great_again.sh
         rm -f /tmp/make_brave_great_again.sh
         ;;
-    4)  
+    4)
         echo "Downloading and running Kron4ek Wine Installer..."
         curl -sSL https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Gaming/Kron4ek-wine-installer.sh -o /tmp/Kron4ek-wine-installer.sh
         chmod +x /tmp/Kron4ek-wine-installer.sh
         /tmp/Kron4ek-wine-installer.sh
         rm -f /tmp/Kron4ek-wine-installer.sh
         ;;
-    5)  
+    5)
         echo "Downloading and running Proton CachyOS Installer..."
         curl -sSL https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Gaming/proton-cachyos-installer.sh -o /tmp/proton-cachyos-installer.sh
         chmod +x /tmp/proton-cachyos-installer.sh
         /tmp/proton-cachyos-installer.sh
         rm -f /tmp/proton-cachyos-installer.sh
+        ;;
+    6)
+        echo "Downloading and running Gigabyte Sleep Fix..."
+        curl -sSL https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Tools/GigabyteSleep-Fix.sh -o /tmp/GigabyteSleep-Fix.sh
+        chmod +x /tmp/GigabyteSleep-Fix.sh
+        /tmp/GigabyteSleep-Fix.sh
+        rm -f /tmp/GigabyteSleep-Fix.sh
         ;;
     *)
         echo "Invalid choice. Exiting."
