@@ -11,11 +11,15 @@ read choice
 case $choice in
     1)
         echo "Running Install Docker"
-        curl -sSL https://codeberg.org/X27/X27-Homelab-ToolBox/raw/branch/main/Servers/Docker-Install.sh | bash
+        wget http://codeberg.org/X27/X27-Homelab-ToolBox/raw/branch/main/Servers/Docker-Install.sh
+        sudo bash Docker-Install.sh
+        sudo rm Docker-Install.sh
         ;;
     2)
-        echo "Running Fedora-PostSetup.sh..."
-        curl -sSL https://codeberg.org/X27/X27-Homelab-ToolBox/raw/branch/main/Servers/Server-Updater.sh | bash
+        echo "Running Server-Updater.sh..."
+        wget https://codeberg.org/X27/X27-Homelab-ToolBox/raw/branch/main/Servers/Server-Updater.sh
+        sudo bash Docker-Install.sh
+        sudo rm Docker-Install.sh
         ;;
     *)
         echo "Invalid choice. Exiting."
