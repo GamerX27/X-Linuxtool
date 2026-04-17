@@ -6,7 +6,8 @@ echo "3) Brave Debloat"
 echo "4) Kron4ek Wine Installer"
 echo "5) Proton CachyOS Installer"
 echo "6) Gigabyte Sleep Fix"
-read -p "Enter your choice (1, 2, 3, 4, 5, or 6): " choice
+echo "7) Custom Fastfetch Config"
+read -p "Enter your choice (1, 2, 3, 4, 5, 6, or 7): " choice
 
 case $choice in
     1)
@@ -44,6 +45,12 @@ case $choice in
         wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Tools/GigabyteSleep-Fix.sh
         sudo bash GigabyteSleep-Fix.sh
         sudo rm GigabyteSleep-Fix.sh
+        ;;
+    7)
+        echo "Downloading and running Fastfetch Config Update..."
+        wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Tools/fsfetch.sh
+        bash fsfetch.sh
+        rm fsfetch.sh
         ;;
     *)
         echo "Invalid choice. Exiting."
