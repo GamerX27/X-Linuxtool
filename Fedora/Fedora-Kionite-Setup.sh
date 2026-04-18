@@ -26,7 +26,6 @@ try() {
 # --- 1. Flatpak Configuration ---
 info "Configuring Flatpak remotes..."
 flatpak remote-modify --disable fedora-testing || true
-flatpak remote-modify --disable fedora || true
 
 # App Cleanup
 info "Cleaning up default KDE apps..."
