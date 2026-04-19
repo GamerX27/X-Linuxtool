@@ -308,17 +308,20 @@ configure_gotify() {
   local url token priority
   while true; do
     read -r -p "Gotify base URL (e.g. https://gotify.example.com): " url
+    url=$(echo "$url" | xargs)
     [[ -n "$url" ]] && break
     echo "URL cannot be empty."
   done
 
   while true; do
     read -r -p "Gotify application token: " token
+    token=$(echo "$token" | xargs)
     [[ -n "$token" ]] && break
     echo "Token cannot be empty."
   done
 
   read -r -p "Default Gotify priority [1-10, default 5]: " priority || true
+  priority=$(echo "$priority" | xargs)
   if [[ -z "$priority" ]]; then
     priority=5
   elif ! [[ "$priority" =~ ^([1-9]|10)$ ]]; then
@@ -347,6 +350,7 @@ read_schedule() {
   local MODE=""
   while true; do
     read -r -p "Schedule monthly or weekly updates? [m/w] " MODE || true
+    MODE=$(echo "$MODE" | xargs)
     case "${MODE,,}" in
       m|monthly)
         MODE="monthly"
@@ -366,6 +370,7 @@ read_schedule() {
   if [[ "$MODE" == "weekly" ]]; then
     echo "Enter the day of the week (mon,tue,wed,thu,fri,sat,sun or 0-6; 0/7=Sun):"
     read -r DOW_IN
+    DOW_IN=$(echo "$DOW_IN" | xargs)
 
     local DNUM
     local DNAME=""
@@ -389,6 +394,7 @@ read_schedule() {
   else
     echo "Enter the day of the month (1-31) for the update run:"
     read -r DOM_IN
+    DOM_IN=$(echo "$DOM_IN" | xargs)
     if ! [[ "$DOM_IN" =~ ^([1-9]|[12][0-9]|3[01])$ ]]; then
       echo "Invalid day of month." >&2
       exit 12
@@ -403,6 +409,7 @@ read_schedule() {
   echo "Enter a time in 24h format **HH:MM**, or one of: morning / afternoon / evening / night"
   echo "  morning=09:00, afternoon=14:00, evening=19:00, night=02:00"
   read -r WHEN
+  WHEN=$(echo "$WHEN" | xargs)
 
   local HH=""
   local MM=""
@@ -422,8 +429,8 @@ read_schedule() {
       ;;
   esac
 
-  CRON_MIN="$(printf '%02d' "$MM")"
-  CRON_HR="$(printf '%02d' "$HH")"
+  CRON_MIN=$(printf '%02d' "$((10#$MM))")
+  CRON_HR=$(printf '%02d' "$((10#$HH))")
   SCHEDULE_DESC="$SUMMARY at $CRON_HR:$CRON_MIN"
 
   echo
@@ -436,7 +443,15 @@ read_schedule() {
 }
 
 install_cron() {
-  local cronfile="/etc/cron.d/os_auto_update"
+  local crondir="/etc/cron.d"
+  local cronfile="$crondir/os_auto_update"
+
+  # Ensure cron.d directory exists
+  if [[ ! -d "$crondir" ]]; then
+    echo "[INFO] Creating $crondir..."
+    mkdir -p "$crondir"
+    chmod 755 "$crondir"
+  fi
 
   # Ensure log file exists and is writable
   touch /var/log/os_update.log
