@@ -18,8 +18,8 @@ case $choice in
     2)
         echo "Running Server-Updater.sh..."
         wget https://codeberg.org/X27/X27-Homelab-ToolBox/raw/branch/main/Servers/Server-Updater.sh
-        sudo bash Docker-Install.sh
-        sudo rm Docker-Install.sh
+        sudo bash Server-Updater.sh
+        sudo rm Server-Updater.sh
         ;;
     *)
         echo "Invalid choice. Exiting."
