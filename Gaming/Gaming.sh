@@ -98,6 +98,11 @@ install_debian_like() {
 
 ########## Fedora / RHEL family ##########
 enable_rpmfusion_fedora() {
+  if dnf repolist | grep -Eq 'rpmfusion-free|rpmfusion-nonfree'; then
+    echo "[*] RPM Fusion repositories already enabled. Skipping."
+    return 0
+  fi
+
   echo "[*] Enabling RPM Fusion (free + nonfree) for Fedora…"
   dnf install -y \
     "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm" \
