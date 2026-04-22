@@ -46,11 +46,12 @@ echo "Choose a script to download and run:"
 echo "1) Fedora Desktop"
 echo "2) HomeLab"
 echo "3) Brave Debloat"
-echo "4) Kron4ek Wine Installer"
-echo "5) Proton CachyOS Installer"
-echo "6) Gigabyte Sleep Fix"
-echo "7) Custom Fastfetch Config"
-read -p "Enter your choice (1, 2, 3, 4, 5, 6, or 7): " choice
+echo "4) YT-DLP-Easy Installer"
+echo "5) Kron4ek Wine Installer"
+echo "6) Proton CachyOS Installer"
+echo "7) Gigabyte Sleep Fix"
+echo "8) Custom Fastfetch Config"
+read -p "Enter your choice (1, 2, 3, 4, 5, 6, 7, or 8): " choice
 
 case $choice in
     1)
@@ -72,24 +73,30 @@ case $choice in
         sudo rm make_brave_great_again.sh
         ;;
     4)
+        echo "Downloading and running YT-DLP-Easy Installer..."
+        wget https://codeberg.org/X27/YTDLP-Easy-Script/raw/branch/main/Install-YT-DLP-Easy.sh
+        bash Install-YT-DLP-Easy.sh
+        sudo rm Install-YT-DLP-Easy.sh
+        ;;
+    5)
         echo "Downloading and running Kron4ek Wine Installer..."
         wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Gaming/Kron4ek-wine-installer.sh
         bash Kron4ek-wine-installer.sh
         rm Kron4ek-wine-installer.sh
         ;;
-    5)
+    6)
         echo "Downloading and running Proton CachyOS Installer..."
         wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Gaming/proton-cachyos-installer.sh
         bash proton-cachyos-installer.sh
         rm proton-cachyos-installer.sh
         ;;
-    6)
+    7)
         echo "Downloading and running Gigabyte Sleep Fix..."
         wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Tools/GigabyteSleep-Fix.sh
         sudo bash GigabyteSleep-Fix.sh
         sudo rm GigabyteSleep-Fix.sh
         ;;
-    7)
+    8)
         echo "Downloading and running Fastfetch Config Update..."
         wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Tools/fsfetch.sh
         bash fsfetch.sh
