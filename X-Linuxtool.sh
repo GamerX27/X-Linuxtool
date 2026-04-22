@@ -1,4 +1,47 @@
 #!/bin/bash
+
+check_and_install_dependencies() {
+    local dependencies=("wget" "git" "curl")
+    local pkg_manager=""
+
+    if command -v apt &> /dev/null; then
+        pkg_manager="apt"
+    elif command -v dnf &> /dev/null; then
+        pkg_manager="dnf"
+    fi
+
+    if [ -z "$pkg_manager" ]; then
+        echo "Unsupported package manager. Please ensure wget, git, and curl are installed manually."
+        return 0
+    fi
+
+    echo "Checking dependencies: ${dependencies[*]}..."
+    local missing_deps=()
+
+    for dep in "${dependencies[@]}"; do
+        if ! command -v "$dep" &> /dev/null; then
+            missing_deps+=("$dep")
+        fi
+    done
+
+    if [ ${#missing_deps[@]} -ne 0 ]; then
+        echo "Missing dependencies: ${missing_deps[*]}. Attempting to install via $pkg_manager..."
+        sudo $pkg_manager update -y &> /dev/null
+        sudo $pkg_manager install -y "${missing_deps[@]}"
+        if [ $? -eq 0 ]; then
+            echo "Dependencies installed successfully."
+        else
+            echo "Failed to install dependencies. Please install them manually."
+            exit 1
+        fi
+    else
+        echo "All dependencies are already installed."
+    fi
+}
+
+# Run dependency check before showing choices
+check_and_install_dependencies
+
 echo "Choose a script to download and run:"
 echo "1) Fedora Desktop"
 echo "2) HomeLab"
