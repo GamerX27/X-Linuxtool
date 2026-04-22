@@ -109,7 +109,7 @@ install_fedora_like() {
 
   # Steam lives in RPM Fusion on Fedora proper
   if [ "${ID:-}" = "fedora" ]; then
-    enable_rpmfusion_pedora
+    enable_rpmfusion_fedora
   else
     echo "[i] On ${PRETTY_NAME:-this system}, Steam may require enabling appropriate repos (e.g., RPM Fusion for EL)."
     echo "    Proceeding to install; if it fails, enable the needed repos and re-run."
