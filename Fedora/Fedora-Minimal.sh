@@ -130,7 +130,7 @@ echo "Installing Dev Tools..."
 # Zed (Flatpak)
 flatpak install flathub dev.zed.Zed -y
 # Grant Zed access to ~/Documents/Code
-flatcap override --user --filesystem=xdg-documents/Code:create dev.zed.Zed
+flatpak override --user --filesystem=xdg-documents/Code:create dev.zed.Zed
 
 # ==============================================================================
 # 11. HOSTNAME SETUP
