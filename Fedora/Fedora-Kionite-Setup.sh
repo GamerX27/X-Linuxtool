@@ -169,8 +169,10 @@ EOF
 systemctl daemon-reload
 systemctl enable --now flatpak-autoupdate.timer
 
+# Enable user-level timer as the real user
 sudo -u "$REAL_USER" XDG_RUNTIME_DIR="/run/user/$USER_UID" systemctl --user daemon-reload
-sudo -u "$REAL_USER" XDG_RUNTIME_DIR="/run/user/$USER_UID" systemctl --user enable --now flatpak-autoupdate.timer
+sudo -u "$REAL_USER" XDG_RUNTIME_DIR="/run/user/$USER_UID" systemctl --user enable flatpak-autoupdate.timer
+sudo -u "$REAL_USER" XDG_RUNTIME_DIR="/run/user/$USER_UID" systemctl --user start flatpak-autoupdate.timer
 
 # --- 5. NetworkManager Connectivity Fix ---
 info "Disabling NetworkManager connectivity check..."
