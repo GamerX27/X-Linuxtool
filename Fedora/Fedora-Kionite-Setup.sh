@@ -159,6 +159,25 @@ info "Performing final system upgrade..."
 sleep 5
 rpm-ostree upgrade
 
+
+# --- 7. Update time ---
+set_locale_time() {
+    echo "Attempting to set LC_TIME to C.UTF-8..."
+    if sudo localectl set-locale LC_TIME=C.UTF-8; then
+        echo "Successfully set LC_TIME."
+    else
+        echo "Error: Failed to set the locale time. Check if you have permission or if the command is correct." >&2
+        return 1
+    fi
+}
+
+set_locale_time
+
+
+
+
+
+
 info "Setup Complete! Rebooting now."
 sleep 5
 reboot
