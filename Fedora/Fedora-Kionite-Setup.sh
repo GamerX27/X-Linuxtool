@@ -72,56 +72,61 @@ cat <<EOF > /etc/rpm-ostreed.conf
 [Daemon]
 AutomaticUpdatePolicy=stage
 EOF
-# Reload rpm-ostreed (ignore failure if service is not active yet)
 systemctl reload rpm-ostreed 2>/dev/null || warn "rpm-ostreed service not active (will be enabled next)."
 systemctl enable --now rpm-ostreed-automatic.timer
 
-# --- 4. Flatpak Auto-Update Timer ---
-info "Configuring system and user-level Flatpak updates with notifications..."
+# --- 4. Unified Flatpak Auto-Update Timer (System + User) ---
+info "Configuring unified Flatpak autoupdate (system + user)..."
 
-# Identify the original user
+# Identify the original user for notifications
 REAL_USER=$(logname)
 USER_UID=$(id -u "$REAL_USER")
-USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
 
-# --- System-wide Configuration ---
-info "Setting up system-level Flatpak autoupdate..."
-cat << 'EOF' > /usr/local/bin/flatpak-system-update.sh
+# Create a unified update script
+cat << 'EOF' > /usr/local/bin/flatpak-unified-update.sh
 #!/bin/bash
+
+# Run system updates
 /usr/bin/flatpak update --system --noninteractive -y
-EXIT_CODE=$?
 
-USER_BUS="unix:path=/run/user/$USER_UID/bus"
-if [ $EXIT_CODE -eq 0 ]; then
-    MESSAGE="System Flatpak updates completed successfully."
-else
-    MESSAGE="System Flatpak update failed with error code $EXIT_CODE."
-fi
+# Run user updates for all users with Flatpak apps
+for user_home in /home/* /var/home/*; do
+    if [ -d "$user_home" ]; then
+        USER_NAME=$(basename "$user_home")
+        USER_UID=$(id -u "$USER_NAME")
+        if [ "$USER_UID" -gt 999 ]; then  # Skip system users
+            echo "Updating Flatpak apps for user: $USER_NAME"
+            sudo -u "$USER_NAME" /usr/bin/flatpak update --user --noninteractive -y
 
-sudo -u "$REAL_USER" DBUS_SESSION_BUS_ADDRESS="$USER_BUS" notify-send "Flatpak System Update" "$MESSAGE"
+            # Send notification
+            USER_BUS="unix:path=/run/user/$USER_UID/bus"
+            sudo -u "$USER_NAME" DBUS_SESSION_BUS_ADDRESS="$USER_BUS" notify-send "Flatpak Update" "Your Flatpak apps have been updated."
+        fi
+    fi
+done
 EOF
 
-chmod +x /usr/local/bin/flatpak-system-update.sh
+chmod +x /usr/local/bin/flatpak-unified-update.sh
 
-# Systemd service for system updates
-cat << 'EOF' > /etc/systemd/system/flatpak-autoupdate.service
+# Create a systemd service for unified updates
+cat << 'EOF' > /etc/systemd/system/flatpak-unified-update.service
 [Unit]
-Description=System Flatpak Autoupdater
+Description=Unified Flatpak Autoupdater (System + User)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/flatpak-system-update.sh
+ExecStart=/usr/local/bin/flatpak-unified-update.sh
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# Systemd timer for system updates
-cat << 'EOF' > /etc/systemd/system/flatpak-autoupdate.timer
+# Create a systemd timer for unified updates
+cat << 'EOF' > /etc/systemd/system/flatpak-unified-update.timer
 [Unit]
-Description=Run System Flatpak update daily and after boot
+Description=Run unified Flatpak update daily and after boot
 
 [Timer]
 OnCalendar=daily
@@ -132,65 +137,9 @@ OnBootSec=5min
 WantedBy=timers.target
 EOF
 
-# Enable system timer
+# Enable the unified timer
 systemctl daemon-reload
-systemctl enable --now flatpak-autoupdate.timer
-
-# --- User-level Configuration ---
-info "Setting up user-level Flatpak autoupdate..."
-mkdir -p "$USER_HOME/.config/systemd/user"
-
-# Script for user updates
-cat << 'EOF' > /usr/local/bin/flatpak-user-update.sh
-#!/bin/bash
-/usr/bin/flatpak update --user --noninteractive -y
-EXIT_CODE=$?
-
-if [ $EXIT_CODE -eq 0 ]; then
-    notify-send "Flatpak User Update" "User Flatpak updates completed successfully."
-else
-    notify-send "Flatpak User Update" "User Flatpak update failed!"
-fi
-EOF
-
-chmod +x /usr/local/bin/flatpak-user-update.sh
-
-# User-level service
-cat << EOF > "$USER_HOME/.config/systemd/user/flatpak-autoupdate.service"
-[Unit]
-Description=User Flatpak Autoupdater
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/flatpak-user-update.sh
-
-[Install]
-WantedBy=default.target
-EOF
-
-# User-level timer
-cat << 'EOF' > "$USER_HOME/.config/systemd/user/flatpak-autoupdate.timer"
-[Unit]
-Description=Run User Flatpak update daily and after boot
-
-[Timer]
-OnCalendar=daily
-Persistent=true
-OnBootSec=5min
-
-[Install]
-WantedBy=timers.target
-EOF
-
-# Enable user timer (with error handling)
-if sudo -u "$REAL_USER" XDG_RUNTIME_DIR="/run/user/$USER_UID" systemctl --user daemon-reload; then
-    sudo -u "$REAL_USER" XDG_RUNTIME_DIR="/run/user/$USER_UID" systemctl --user enable flatpak-autoupdate.timer
-    sudo -u "$REAL_USER" XDG_RUNTIME_DIR="/run/user/$USER_UID" systemctl --user start flatpak-autoupdate.timer
-else
-    warn "Failed to enable user-level Flatpak autoupdate timer. The user may need to log in first."
-fi
+systemctl enable --now flatpak-unified-update.timer
 
 # --- 5. NetworkManager Connectivity Fix ---
 info "Disabling NetworkManager connectivity check..."
