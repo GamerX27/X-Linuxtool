@@ -16,37 +16,54 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 info() { echo -e "${GREEN}[INFO]${NC} $1"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 try() {
   local msg="$1"
   shift
   echo -e "${YELLOW}[TRY]${NC} $msg"
-  if "$@"; then echo -e "${GREEN}[OK]${NC} $msg"; else echo -e "${RED}[FAILED]${NC} $msg"; exit 1; fi
+  if "$@"; then
+    echo -e "${GREEN}[OK]${NC} $msg"
+  else
+    echo -e "${RED}[FAILED]${NC} $msg"
+    exit 1
+  fi
 }
 
 # --- 1. Flatpak Configuration ---
 info "Configuring Flatpak remotes..."
-flatpak remote-modify --disable fedora-testing || true
-flatpak remote-modify --disable fedora || true
+flatpak remote-modify --disable fedora-testing || warn "Failed to disable fedora-testing remote (may not exist)."
+flatpak remote-modify --disable fedora || warn "Failed to disable fedora remote (may not exist)."
 
 # App Cleanup
 info "Cleaning up default KDE apps..."
 APPS_TO_REMOVE=(org.kde.elisa org.kde.kmahjongg org.kde.kolourpaint org.kde.kmines)
 for app in "${APPS_TO_REMOVE[@]}"; do
     if flatpak list --app | grep -q "$app"; then
-        flatpak remove -y "$app" || true
+        flatpak remove -y "$app" || warn "Failed to remove $app (may not be installed)."
     fi
 done
 
 # Install Apps
-try "Installing core Flatpaks" \
-    flatpak -y install flathub com.brave.Browser org.videolan.VLC org.jellyfin.JellyfinDesktop org.localsend.localsend_app io.github.kolunmi.Bazaar com.unicornsonlsd.finamp
+info "Installing core Flatpaks..."
+try "Installing Flatpaks" \
+    flatpak -y install flathub \
+    com.brave.Browser \
+    org.videolan.VLC \
+    org.jellyfin.JellyfinDesktop \
+    org.localsend.localsend_app \
+    io.github.kolunmi.Bazaar \
+    com.unicornsonlsd.finamp
 
 # --- 2. Brave Debloat ---
 info "Debloating Brave Browser..."
 BRAVE_DEBLOAT_URL="https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Browser/make_brave_great_again.sh"
 wget -q -O /tmp/make_brave_great_again.sh "$BRAVE_DEBLOAT_URL"
 chmod +x /tmp/make_brave_great_again.sh
-bash /tmp/make_brave_great_again.sh
+if bash /tmp/make_brave_great_again.sh; then
+    echo -e "${GREEN}[OK]${NC} Brave Browser debloat completed."
+else
+    warn "Brave Browser debloat may have failed (non-critical)."
+fi
 rm -f /tmp/make_brave_great_again.sh
 
 # --- 3. RPM-OSTree Automatic Updates ---
@@ -55,41 +72,38 @@ cat <<EOF > /etc/rpm-ostreed.conf
 [Daemon]
 AutomaticUpdatePolicy=stage
 EOF
-systemctl reload rpm-ostreed || true
+# Reload rpm-ostreed (ignore failure if service is not active yet)
+systemctl reload rpm-ostreed 2>/dev/null || warn "rpm-ostreed service not active (will be enabled next)."
 systemctl enable --now rpm-ostreed-automatic.timer
 
 # --- 4. Flatpak Auto-Update Timer ---
 info "Configuring system and user-level Flatpak updates with notifications..."
 
-# Identify the original user to handle notifications and user-level configs
+# Identify the original user
 REAL_USER=$(logname)
 USER_UID=$(id -u "$REAL_USER")
 USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
 
 # --- System-wide Configuration ---
-# Create the system update script
-cat << EOF > /usr/local/bin/flatpak-system-update.sh
+info "Setting up system-level Flatpak autoupdate..."
+cat << 'EOF' > /usr/local/bin/flatpak-system-update.sh
 #!/bin/bash
-# Run the update
 /usr/bin/flatpak update --system --noninteractive -y
-EXIT_CODE=\$?
+EXIT_CODE=$?
 
-# Define the connection to the user's desktop session
 USER_BUS="unix:path=/run/user/$USER_UID/bus"
-
-if [ \$EXIT_CODE -eq 0 ]; then
+if [ $EXIT_CODE -eq 0 ]; then
     MESSAGE="System Flatpak updates completed successfully."
 else
-    MESSAGE="System Flatpak update failed with error code \$EXIT_CODE."
+    MESSAGE="System Flatpak update failed with error code $EXIT_CODE."
 fi
 
-# Send the notification to the user's KDE desktop
-sudo -u "$REAL_USER" DBUS_SESSION_BUS_ADDRESS="\$USER_BUS" notify-send "Flatpak System Update" "\$MESSAGE"
+sudo -u "$REAL_USER" DBUS_SESSION_BUS_ADDRESS="$USER_BUS" notify-send "Flatpak System Update" "$MESSAGE"
 EOF
 
 chmod +x /usr/local/bin/flatpak-system-update.sh
 
-# Create the systemd service file
+# Systemd service for system updates
 cat << 'EOF' > /etc/systemd/system/flatpak-autoupdate.service
 [Unit]
 Description=System Flatpak Autoupdater
@@ -104,7 +118,7 @@ ExecStart=/usr/local/bin/flatpak-system-update.sh
 WantedBy=multi-user.target
 EOF
 
-# Create the systemd timer file
+# Systemd timer for system updates
 cat << 'EOF' > /etc/systemd/system/flatpak-autoupdate.timer
 [Unit]
 Description=Run System Flatpak update daily and after boot
@@ -118,16 +132,21 @@ OnBootSec=5min
 WantedBy=timers.target
 EOF
 
+# Enable system timer
+systemctl daemon-reload
+systemctl enable --now flatpak-autoupdate.timer
+
 # --- User-level Configuration ---
+info "Setting up user-level Flatpak autoupdate..."
 mkdir -p "$USER_HOME/.config/systemd/user"
 
-# Create a script for the user level to handle its own notifications easily
-cat << EOF > /usr/local/bin/flatpak-user-update.sh
+# Script for user updates
+cat << 'EOF' > /usr/local/bin/flatpak-user-update.sh
 #!/bin/bash
 /usr/bin/flatpak update --user --noninteractive -y
-EXIT_CODE=\$?
+EXIT_CODE=$?
 
-if [ \$EXIT_CODE -eq 0 ]; then
+if [ $EXIT_CODE -eq 0 ]; then
     notify-send "Flatpak User Update" "User Flatpak updates completed successfully."
 else
     notify-send "Flatpak User Update" "User Flatpak update failed!"
@@ -136,7 +155,7 @@ EOF
 
 chmod +x /usr/local/bin/flatpak-user-update.sh
 
-# Create the user-level service file
+# User-level service
 cat << EOF > "$USER_HOME/.config/systemd/user/flatpak-autoupdate.service"
 [Unit]
 Description=User Flatpak Autoupdater
@@ -151,7 +170,7 @@ ExecStart=/usr/local/bin/flatpak-user-update.sh
 WantedBy=default.target
 EOF
 
-# Create the user-level timer file
+# User-level timer
 cat << 'EOF' > "$USER_HOME/.config/systemd/user/flatpak-autoupdate.timer"
 [Unit]
 Description=Run User Flatpak update daily and after boot
@@ -165,14 +184,13 @@ OnBootSec=5min
 WantedBy=timers.target
 EOF
 
-# Reload and enable
-systemctl daemon-reload
-systemctl enable --now flatpak-autoupdate.timer
-
-# Enable user-level timer as the real user
-sudo -u "$REAL_USER" XDG_RUNTIME_DIR="/run/user/$USER_UID" systemctl --user daemon-reload
-sudo -u "$REAL_USER" XDG_RUNTIME_DIR="/run/user/$USER_UID" systemctl --user enable flatpak-autoupdate.timer
-sudo -u "$REAL_USER" XDG_RUNTIME_DIR="/run/user/$USER_UID" systemctl --user start flatpak-autoupdate.timer
+# Enable user timer (with error handling)
+if sudo -u "$REAL_USER" XDG_RUNTIME_DIR="/run/user/$USER_UID" systemctl --user daemon-reload; then
+    sudo -u "$REAL_USER" XDG_RUNTIME_DIR="/run/user/$USER_UID" systemctl --user enable flatpak-autoupdate.timer
+    sudo -u "$REAL_USER" XDG_RUNTIME_DIR="/run/user/$USER_UID" systemctl --user start flatpak-autoupdate.timer
+else
+    warn "Failed to enable user-level Flatpak autoupdate timer. The user may need to log in first."
+fi
 
 # --- 5. NetworkManager Connectivity Fix ---
 info "Disabling NetworkManager connectivity check..."
@@ -181,7 +199,7 @@ NM_FILE_ETC="${NM_DIR_ETC}/20-connectivity-fedora.conf"
 
 mkdir -p "$NM_DIR_ETC"
 if [[ -e "$NM_FILE_ETC" ]]; then
-    cp -n "$NM_FILE_ETC" "${NM_FILE_ETC}.bak" || true
+    cp -n "$NM_FILE_ETC" "${NM_FILE_ETC}.bak" || warn "Failed to back up NetworkManager config."
 fi
 
 printf '[connectivity]\nenabled=false\n' > "$NM_FILE_ETC"
