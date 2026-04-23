@@ -59,35 +59,118 @@ systemctl reload rpm-ostreed || true
 systemctl enable --now rpm-ostreed-automatic.timer
 
 # --- 4. Flatpak Auto-Update Timer ---
-info "Configuring daily Flatpak update service..."
-SERVICE_FILE="/etc/systemd/system/update-system-flatpaks.service"
-TIMER_FILE="/etc/systemd/system/update-system-flatpaks.timer"
+info "Configuring system and user-level Flatpak updates with notifications..."
 
-cat <<EOF > "$SERVICE_FILE"
+# Identify the original user to handle notifications and user-level configs
+REAL_USER=$(logname)
+USER_UID=$(id -u "$REAL_USER")
+USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
+
+# --- System-wide Configuration ---
+# Create the system update script
+cat << EOF > /usr/local/bin/flatpak-system-update.sh
+#!/bin/bash
+# Run the update
+/usr/bin/flatpak update --system --noninteractive -y
+EXIT_CODE=\$?
+
+# Define the connection to the user's desktop session
+USER_BUS="unix:path=/run/user/$USER_UID/bus"
+
+if [ \$EXIT_CODE -eq 0 ]; then
+    MESSAGE="System Flatpak updates completed successfully."
+else
+    MESSAGE="System Flatpak update failed with error code \$EXIT_CODE."
+fi
+
+# Send the notification to the user's KDE desktop
+sudo -u "$REAL_USER" DBUS_SESSION_BUS_ADDRESS="\$USER_BUS" notify-send "Flatpak System Update" "\$MESSAGE"
+EOF
+
+chmod +x /usr/local/bin/flatpak-system-update.sh
+
+# Create the systemd service file
+cat << 'EOF' > /etc/systemd/system/flatpak-autoupdate.service
 [Unit]
-Description=Update system Flatpaks
+Description=System Flatpak Autoupdater
 After=network-online.target
 Wants=network-online.target
+
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/flatpak update --assumeyes --noninteractive --system
+ExecStart=/usr/local/bin/flatpak-system-update.sh
+
 [Install]
 WantedBy=multi-user.target
 EOF
 
-cat <<EOF > "$TIMER_FILE"
+# Create the systemd timer file
+cat << 'EOF' > /etc/systemd/system/flatpak-autoupdate.timer
 [Unit]
-Description=Update system Flatpaks daily
+Description=Run System Flatpak update daily and after boot
+
 [Timer]
 OnCalendar=daily
 Persistent=true
-AccuracySec=1h
+OnBootSec=5min
+
 [Install]
 WantedBy=timers.target
 EOF
 
+# --- User-level Configuration ---
+mkdir -p "$USER_HOME/.config/systemd/user"
+
+# Create a script for the user level to handle its own notifications easily
+cat << EOF > /usr/local/bin/flatpak-user-update.sh
+#!/bin/bash
+/usr/bin/flatpak update --user --noninteractive -y
+EXIT_CODE=\$?
+
+if [ \$EXIT_CODE -eq 0 ]; then
+    notify-send "Flatpak User Update" "User Flatpak updates completed successfully."
+else
+    notify-send "Flatpak User Update" "User Flatpak update failed!"
+fi
+EOF
+
+chmod +x /usr/local/bin/flatpak-user-update.sh
+
+# Create the user-level service file
+cat << EOF > "$USER_HOME/.config/systemd/user/flatpak-autoupdate.service"
+[Unit]
+Description=User Flatpak Autoupdater
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/flatpak-user-update.sh
+
+[Install]
+WantedBy=default.target
+EOF
+
+# Create the user-level timer file
+cat << 'EOF' > "$USER_HOME/.config/systemd/user/flatpak-autoupdate.timer"
+[Unit]
+Description=Run User Flatpak update daily and after boot
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+OnBootSec=5min
+
+[Install]
+WantedBy=timers.target
+EOF
+
+# Reload and enable
 systemctl daemon-reload
-systemctl enable --now update-system-flatpaks.timer
+systemctl enable --now flatpak-autoupdate.timer
+
+sudo -u "$REAL_USER" XDG_RUNTIME_DIR="/run/user/$USER_UID" systemctl --user daemon-reload
+sudo -u "$REAL_USER" XDG_RUNTIME_DIR="/run/user/$USER_UID" systemctl --user enable --now flatpak-autoupdate.timer
 
 # --- 5. NetworkManager Connectivity Fix ---
 info "Disabling NetworkManager connectivity check..."
