@@ -79,7 +79,7 @@ esac
 # 6. UTILITIES & CORE APPS
 # ==============================================================================
 echo "Installing system utilities and core apps..."
-dnf install wget fastfetch fish htop nano papirus-icon-theme curl -y
+dnf install wget fastfetch fish htop nano papirus-icon-theme curl lspci sensors -y
 dnf install vlc nextcloud-client easyeffects gnome-disk-utility libreoffice-writer -y
 dnf remove -y dragon juk elisa-player kmail khelpcenter
 
