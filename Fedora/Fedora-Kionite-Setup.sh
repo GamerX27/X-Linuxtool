@@ -131,7 +131,7 @@ Description=Run unified Flatpak update daily and after boot
 [Timer]
 OnCalendar=daily
 Persistent=true
-OnBootSec=5min
+# RandomizedDelaySec=1h  # Uncomment if you want to spread updates
 
 [Install]
 WantedBy=timers.target
@@ -159,7 +159,6 @@ info "Performing final system upgrade..."
 sleep 5
 rpm-ostree upgrade
 
-
 # --- 7. Update time ---
 set_locale_time() {
     echo "Attempting to set LC_TIME to C.UTF-8..."
@@ -172,11 +171,6 @@ set_locale_time() {
 }
 
 set_locale_time
-
-
-
-
-
 
 info "Setup Complete! Rebooting now."
 sleep 5
