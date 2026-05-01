@@ -1,19 +1,17 @@
 #!/bin/bash
 
-# ==============================================================================
-# Fedora Kinoite/Silverblue Complete Setup
-# This script MUST be run as a single block to ensure functions are defined.
-# ==============================================================================
+# Check if the script is being run with sudo privileges
+if [[ $EUID -ne 0 ]]; then
+   echo "This script must be run as root (use sudo)."
+   exit 1
+fi
 
-# EXIT IMMEDIATELY if any command fails or if the user interrupts (Ctrl+C)
-set -e
-trap 'echo -e "\n\e[31m[INTERRUPTED]\e[0m Process stopped by user. Not rebooting.\n"; exit 1' SIGINT SIGTERM
+# This stops the script from continuing if you press Ctrl+C
+trap 'echo -e "\nProcess interrupted. Exiting."; exit 1' SIGINT SIGTERM
 
-# --- Helper Functions (CRITICAL: These must be in the same file!) ---
-info() { echo -e "\e[32m[INFO]\e[0m $1"; }
-warn() { echo -e "\e[33m[WARN]\e[0m $1" >&2; }
-error() { echo -e "\e[31m[ERROR]\e[0m $1" >&2; exit 1; }
-
+# Functions to handle the logging used in your code
+info() { echo -e "[INFO] $1"; }
+warn() { echo -e "[WARN] $arg" >&2; }
 try() {
     local msg="$1"
     shift
@@ -25,98 +23,80 @@ try() {
     fi
 }
 
-# --- Configuration Variables ---
-FLATPAK_APPS=(
-    "com.brave.Browser"
-    "org.videolan.VLC"
-    "org.jellyfin.JellyfinDesktop"
-    "org.localsend.localsend_app"
-    "io.github.kolunmi.Bazaar"
-    "com.unicornsonlsd.finamp"
+# --- Configuration ---
+APPS_TO_REMOVE=(org.kde.elisa org.kde.kmahjongg org.kde.kolourpaint org.kde.kmines)
+APPS_TO_INSTALL=(
+    com.brave.Browser 
+    org.videolan.VLC 
+    org.jellyfin.JellyfinDesktop 
+    org.localsend.localsend_app 
+    io.github.kolunmi.Bazaar 
+    com.unicornsonlsd.finamp
 )
 
-KDE_BLOAT=(
-    "org.kde.elisa"
-    "org.kde.kmahjongg"
-    "org.kde.kolourpaint"
-    "org.kde.kmines"
-)
-
-NM_CONF_DIR="/etc/NetworkManager/conf.d"
-NM_CONF_FILE="${NM_CONF_DIR}/20-connectivity-fedora.conf"
-
-# --- 1. Flatpak Remote Configuration ---
+# --- Flatpak Remote Configuration ---
 info "Configuring Flatpak remotes..."
-if ! flatpak remote-exists flathub; then
-    info "Adding Flathulb remote..."
-    flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-fi
+flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak remote-modify --disable fedora-testing || warn "Failed to disable fedora-testing remote (may not exist)."
+flatpak remote-modify --disable fedora || warn "Failed to disable fedora remote (may not exist)."
 
-sudo flatpak remote-modify --disable fedora-testing 2>/dev/null || warn "fedora-testing remote not found."
-sudo flatpak remote-modify --disable fedora 2>/dev/null || warn "fedora remote not found."
-
-# --- 2. App Cleanup ---
+# --- App Cleanup ---
 info "Cleaning up default KDE apps..."
-for app in "${KDE_BLOAT[@]}"; do
+for app in "${APPS_TO_REMOVE[@]}"; do
     if flatpak list --app | grep -q "$app"; then
-        info "Removing $app..."
-        flatlamat-remove -y "$app" || warn "Failed to remove $app."
+        flatpak remove -y "$app" || warn "Failed to remove $app (may not be installed)."
     fi
 done
 
-# --- 3. App Installation ---
+# --- Install Apps ---
 info "Installing core Flatpaks..."
-for app in "${FLATPAK_APPS[@]}"; do
-    try "Installing $app" flatpak install -y flathub "$app"
+for app in "${APPS_TO_INSTALL[@]}"; do
+    try "Installing $app" flatpak -y install flathub "$app"
 done
 
-info "Running Flatpak updates..."
+# --- Update Flatpaks ---
+info "Running initial Flatpak update..."
 flatpak update -y
-sudo flatpak --system update -y
+flatpak --system update -lag
 
-# --- 4. NetworkManager Fix ---
+# --- NetworkManager Connectivity Fix ---
 info "Disabling NetworkManager connectivity check..."
-sudo mkdir -p "$NM_CONF_DIR"
-if [[ -e "$NM_CONF_FILE" ]]; then
-    sudo cp -n "$NM_CONF_FILE" "${NM_CONF_FILE}.bak" || warn "Backup failed."
+NM_DIR_ETC="/etc/NetworkManager/conf.d"
+NM_FILE_ETC="${NM_DIR_ETC}/20-connectivity-fedora.conf"
+mkdir -p "$NM_DIR_ETC"
+if [[ -e "$NM_FILE_ETC" ]]; then
+    cp -n "$NM_FILE_ETC" "${NM_FILE_ETC}.bak" || warn "Failed to back up NetworkManager config."
 fi
-echo -e '[connectivity]\nenabled=false' | sudo tee "$NM_CONF_FILE" > /dev/null
-sudo systemctl restart NetworkManager
+printf '[connectivity]\nenabled=false\n' > "$NM_FILE_ETC"
+systemctl restart NetworkManager
 
-# --- 5. rpm-ostree Automation ---
+# --- RPM-OSTree Automatic Updates ---
 info "Configuring rpm-ostree automatic updates..."
-sudo tee /etc/rpm-ostreed.conf > /dev/null <<EOF
+cat <<EOF > /etc/rpm-ostreed.conf
 [Daemon]
 AutomaticUpdatePolicy=stage
 EOF
+systemctl reload rpm-ostreed 2>/dev/null || warn "rpm-ostreed service not active (will be enabled next)."
+systemctl enable --now rpm-ostree-automatic.timer
 
-# Check if the timer exists before enabling to prevent error
-if systemctl list-unit-files | grep -q "rpm-ostree-automatic.timer"; then
-    sudo systemctl enable --now rpm-ostree-automatic.timer
-else
-    warn "rpm-ostree-automatic.timer not found. Please install 'rpm-ostree-automatic'."
-fi
-
-# --- 6. Final System Upgrade ---
+# --- Final System Upgrade ---
 info "Performing final system upgrade..."
-info "This part may take a long time. DO NOT interrupt."
-if sudo rpm-ostree upgrade; then
-    info "System upgrade successful."
-else
-    error "System upgrade failed! Check logs with 'journalctl -xe'. Skipping reboot."
-fi
+sleep 5
+rpm-ostree upgrade
 
-# --- 7. Locale Setup ---
-info "Setting LC_TIME to C.UTF-8..."
-sudo localectl set-locale LC_TIME=C.UTF-8
+# --- Update time ---
+set_locale_time() {
+    echo "Attempting to set LC_TIME to C.UTF-8..."
+    if localectl set-locale LC_TIME=C.UTF-8; then
+        echo "Successfully set LC_TIME."
+    else
+        echo "Error: Failed to set the locale time." >&2
+        return 1
+    fi
+}
+set_locale_time
 
-# --- 8. Final Reboot Sequence ---
-info "Setup Complete! System will reboot in 15 seconds."
-info "Press Ctrl+C now if you need to cancel the reboot."
-
-for i in {15..1}; do
-    echo -ne "Rebooting in $i... \r"
-    sleep 1
-done
-
-sudo reboot
+# --- Shutdown Sequence ---
+info "Setup Complete! Rebooting now."
+sleep 5
+reboot
