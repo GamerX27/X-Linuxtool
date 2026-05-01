@@ -89,73 +89,22 @@ EOF
 systemctl reload rpm-ostreed 2>/dev/null || warn "rpm-ostreed service not active (will be enabled next)."
 systemctl enable --now rpm-ostreed-automatic.timer
 
-# --- 4. System Flatpak Auto-Update (with Notifications) ---
-info "Configuring system Flatpak autoupdate..."
+---
+### 4. Flatpak Auto-Update (User-Level)
+info "Setting up user-level Flatpak autoupdate..."
+FLATPAK_AUTOUPDATE_URL="https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Flatpak/Flatpak-AutoUpdate-Setup.sh"
+wget -q -O /tmp/Flatpak-AutoUpdate-Setup.sh "$FLATPAK_AUTOUPDATE_URL"
+chmod +x /tmp/Flatpak-AutoUpdate-Setup.sh
 
-# Create the update script
-cat << 'SCRIPT' > /usr/local/bin/system-flatpak-update.sh
-#!/bin/bash
-
-# Exit if run too recently
-LAST_RUN_FILE="/var/lib/flatpak-autoupdate-lastrun"
-NOW=$(date +%s)
-if [ -f "$LAST_RUN_FILE" ]; then
-    LAST_RUN=$(cat "$LAST_RUN_FILE")
-    if [ $(( NOW - LAST_RUN )) -lt 86400 ]; then
-        exit 0
-    fi
-fi
-
-# Update system Flatpaks
-/usr/bin/flatpak --system update -y
-
-# Send notification ONLY to users with an active desktop session
 for user in $(loginctl list-sessions --no-legend --value | awk '{print $1}'); do
     USER_UID=$(id -u "$user" 2>/dev/null || continue)
     DBUS_ADDRESS="unix:path=/run/user/$USER_UID/bus"
     if [ -S "/run/user/$USER_UID/bus" ]; then
-        su - "$user" -c "DBUS_SESSION_BUS_ADDRESS=$DBUS_ADDRESS notify-send 'Flatpak Update' 'Your system Flatpaks have been updated.'"
+        su - "$user" -c "bash /tmp/Flatpak-AutoUpdate-Setup.sh"
     fi
 done
 
-# Record the last run time
-echo "$NOW" > "$LAST_RUN_FILE"
-SCRIPT
-
-chmod +x /usr/local/bin/system-flatpak-update.sh
-
-# Create the systemd service
-cat << 'EOF' > /etc/systemd/system/auto-update-system-flatpaks.service
-[Unit]
-Description=Automatically update system Flatpaks and notify users
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/system-flatpak-update.sh
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Create the systemd timer
-cat << 'EOF' > /etc/systemd/system/auto-update-system-flatpaks.timer
-[Unit]
-Description=Daily automatic update of system Flatpaks
-
-[Timer]
-OnCalendar=daily
-Persistent=true
-OnBootSec=1min
-
-[Install]
-WantedBy=timers.target
-EOF
-
-# Enable and start the timer
-systemctl daemon-reload
-systemctl enable --now auto-update-system-flatpaks.timer
+rm -f /tmp/Flatpak-AutoUpdate-Setup.sh
 
 # --- 5. NetworkManager Connectivity Fix ---
 info "Disabling NetworkManager connectivity check..."
