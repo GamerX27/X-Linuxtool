@@ -77,7 +77,7 @@ cat <<EOF > /etc/rpm-ostreed.conf
 AutomaticUpdatePolicy=stage
 EOF
 systemctl reload rpm-ostreed 2>/dev/null || warn "rpm-ostreed service not active (will be enabled next)."
-systemctl enable --now rpm-ostree-automatic.timer
+systemctl enable --now rpm-ostreed-automatic.timer
 
 # --- Final System Upgrade ---
 info "Performing final system upgrade..."
