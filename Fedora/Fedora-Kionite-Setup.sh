@@ -54,6 +54,18 @@ try "Installing Flatpaks" \
     io.github.kolunmi.Bazaar \
     com.unicornsonlsd.finamp
 
+# --- Run Flatpak Update and Notify ---
+info "Running initial Flatpak update..."
+flatpak update -y
+flatpak --system update -y
+
+# Send notification to all logged-in users
+for user in $(who | awk '{print $1}' | sort -u); do
+    USER_UID=$(id -u "$user")
+    DBUS_ADDRESS="unix:path=/run/user/$USER_UID/bus"
+    su - "$user" -c "DBUS_SESSION_BUS_ADDRESS=$DBUS_ADDRESS notify-send 'Flatpak Update' 'Your Flatpaks have been updated during setup.'"
+done
+
 # --- 2. Brave Debloat ---
 info "Debloating Brave Browser..."
 BRAVE_DEBLOAT_URL="https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Browser/make_brave_great_again.sh"
@@ -75,14 +87,14 @@ EOF
 systemctl reload rpm-ostreed 2>/dev/null || warn "rpm-ostreed service not active (will be enabled next)."
 systemctl enable --now rpm-ostreed-automatic.timer
 
-# --- 4. System Flatpak Auto-Update (with KDE Notifications) ---
+# --- 4. System Flatpak Auto-Update (with Notifications) ---
 info "Configuring system Flatpak autoupdate..."
 
-# Create a script to handle the update and notifications
-cat << 'EOF' > /usr/local/bin/system-flatpak-update.sh
+# Create the update script
+cat << 'SCRIPT' > /usr/local/bin/system-flatpak-update.sh
 #!/bin/bash
 
-# Check if last run was more than 24 hours ago
+# Exit if run too recently
 LAST_RUN_FILE="/var/lib/flatpak-autoupdate-lastrun"
 NOW=$(date +%s)
 if [ -f "$LAST_RUN_FILE" ]; then
@@ -92,36 +104,26 @@ if [ -f "$LAST_RUN_FILE" ]; then
     fi
 fi
 
-# Run system updates
+# Update system Flatpaks
 /usr/bin/flatpak --system update -y
 
-# Send notification to all active users via DBUS
-for user_home in /home/* /var/home/*; do
-    if [ -d "$user_home" ]; then
-        USER_NAME=$(basename "$user_home")
-        if id "$USER_NAME" >/dev/null 2>&1; then
-            USER_UID=$(id -u "$USER_NAME")
-            if [ "$USER_UID" -gt 999 ]; then  # Skip system users
-                USER_BUS="unix:path=/run/user/$USER_UID/bus"
-                # Check if bus exists before sending notification
-                if [ -S "$USER_BUS" ]; then
-                    sudo -u "$USER_NAME" DBUS_SESSION_BUS_ADDRESS="$USER_BUS" notify-send "Flatpak Update" "Your system Flatpaks have been updated."
-                fi
-            fi
-        fi
-    fi
+# Send notification to all logged-in users
+for user in $(who | awk '{print $1}' | sort -u); do
+    USER_UID=$(id -u "$user")
+    DBUS_ADDRESS="unix:path=/run/user/$USER_UID/bus"
+    su - "$user" -c "DBUS_SESSION_BUS_ADDRESS=$DBUS_ADDRESS notify-send 'Flatpak Update' 'Your system Flatpaks have been updated.'"
 done
 
 # Record the last run time
 echo "$NOW" > "$LAST_RUN_FILE"
-EOF
+SCRIPT
 
 chmod +x /usr/local/bin/system-flatpak-update.sh
 
-# Create the systemd service file as specified
+# Create the systemd service
 cat << 'EOF' > /etc/systemd/system/auto-update-system-flatpaks.service
 [Unit]
-Description=Automatically update system Flatpaks
+Description=Automatically update system Flatpaks and notify users
 After=network-online.target
 Wants=network-online.target
 
@@ -133,7 +135,7 @@ ExecStart=/usr/local/bin/system-flatpak-update.sh
 WantedBy=multi-user.target
 EOF
 
-# Create the systemd timer file as specified
+# Create the systemd timer
 cat << 'EOF' > /etc/systemd/system/auto-update-system-flatpaks.timer
 [Unit]
 Description=Daily automatic update of system Flatpaks
@@ -150,9 +152,6 @@ EOF
 # Enable and start the timer
 systemctl daemon-reload
 systemctl enable --now auto-update-system-flatpaks.timer
-
-# Initial run to test
-systemctl start auto-update-system-flatpaks.service
 
 # --- 5. NetworkManager Connectivity Fix ---
 info "Disabling NetworkManager connectivity check..."
