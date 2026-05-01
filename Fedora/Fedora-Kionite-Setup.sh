@@ -99,6 +99,16 @@ set_locale_time() {
 }
 set_locale_time
 
+# --- Flatpak Autostart for Updates ---
+info "Setting up Flatpak autostart for updates..."
+mkdir -p ~/.config/autostart
+cat > ~/.config/autostart/flatup <<EOF
+#!/bin/sh
+sleep 30
+flatpak update --noninteractive && notify-send -a "Updater" "Apps updated!"
+EOF
+chmod +x ~/.config/autostart/flatup
+
 # --- Shutdown Sequence ---
 info "Setup Complete! Rebooting in 5 seconds. Press Ctrl+C to cancel."
 sleep 5
