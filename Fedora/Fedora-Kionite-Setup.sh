@@ -1,142 +1,147 @@
 #!/bin/bash
 
-# --- FORCED SUDO BLOCK ---
-if [[ $EUID -ne 0 ]]; then
-   echo "This script requires root privileges. Re-running with sudo..."
-   exec sudo "$0" "$@"
-fi
+# ==============================================================================
+# Script Name: setup-fedora-immutable.sh
+# Description: Configures Fedora (Silverblue/Kinoite) for a streamlined 
+#              user experience by optimizing Flatpak, NetworkManager, 
+#              and rpm-ostree settings.
+# Author: Linux System Admin Expert
+# Requirements: sudo privileges, internet connection
+# ==============================================================================
 
-# Set strict error handling
-set -euo pipefail
+set -e  # Exit on error
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+# --- Helper Functions ---
+info() { echo -e "\e[32m[INFO]\e[0m $1"; }
+warn() { echo -else -e "\e[33m[WARN]\e[0m $1" >&2; }
+error() { echo -e "\e[31m[ERROR]\e[0m $1" >&2; exit 1; }
 
-info() { echo -e "${GREEN}[INFO]${NC} $1"; }
-warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+# A 'try' function to wrap commands with error reporting
 try() {
-  local msg="$1"
-  shift
-  echo -e "${YELLOW}[TRY]${NC} $msg"
-  if "$@"; then
-    echo -e "${GREEN}[OK]${NC} $msg"
-  else
-    echo -e "${RED}[FAILED]${NC} $msg"
-    exit 1
-  fi
-}
-
-# --- 1. Flatpak Configuration ---
-info "Configuring Flatpak remotes..."
-flatpak remote-modify --disable fedora-testing || warn "Failed to disable fedora-testing remote (may not exist)."
-flatpak remote-modify --disable fedora || warn "Failed to disable fedora remote (may not exist)."
-
-# App Cleanup
-info "Cleaning up default KDE apps..."
-APPS_TO_REMOVE=(org.kde.elisa org.kde.kmahjongg org.kde.kolourpaint org.kde.kmines)
-for app in "${APPS_TO_REMOVE[@]}"; do
-    if flatpak list --app | grep -q "$app"; then
-        flatpak remove -y "$app" || warn "Failed to remove $app (may not be installed)."
-    fi
-done
-
-# Install Apps
-info "Installing core Flatpaks..."
-try "Installing Flatpaks" \
-    flatpak -y install flathub \
-    com.brave.Browser \
-    org.videolan.VLC \
-    org.jellyfin.JellyfinDesktop \
-    org.localsend.localsend_app \
-    io.github.kolunmi.Bazaar \
-    com.unicornsonlsd.finamp
-
-# --- Run Flatpak Update and Notify ---
-info "Running initial Flatpak update..."
-flatpak update -y
-flatpak --system update -y
-
-# Send notification ONLY to users with an active desktop session
-for user in $(loginctl list-sessions --no-legend --value | awk '{print $1}'); do
-    USER_UID=$(id -u "$user" 2>/dev/null || continue)
-    DBUS_ADDRESS="unix:path=/run/user/$USER_UID/bus"
-    if [ -S "/run/user/$USER_UID/bus" ]; then
-        su - "$user" -c "DBUS_SESSION_BUS_ADDRESS=$DBUS_ADDRESS notify-send 'Flatpak Update' 'Your Flatpaks have been updated during setup.'"
-    fi
-done
-
-# --- 2. Brave Debloat ---
-info "Debloating Brave Browser..."
-BRAVE_DEBLOAT_URL="https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Browser/make_brave_great_again.sh"
-wget -q -O /tmp/make_brave_great_again.sh "$BRAVE_DEBLOAT_URL"
-chmod +x /tmp/make_brave_great_again.sh
-if bash /tmp/make_brave_great_again.sh; then
-    echo -e "${GREEN}[OK]${NC} Brave Browser debloat completed."
-else
-    warn "Brave Browser debloat may have failed (non-critical)."
-fi
-rm -f /tmp/make_brave_great_again.sh
-
-# --- 3. RPM-OSTree Automatic Updates ---
-info "Configuring rpm-ostree automatic updates..."
-cat <<EOF > /etc/rpm-ostreed.conf
-[Daemon]
-AutomaticUpdatePolicy=stage
-EOF
-systemctl reload rpm-ostreed 2>/dev/null || warn "rpm-ostreed service not active (will be enabled next)."
-systemctl enable --now rpm-ostreed-automatic.timer
-
----
-### 4. Flatpak Auto-Update (User-Level)
-info "Setting up user-level Flatpak autoupdate..."
-FLATPAK_AUTOUPDATE_URL="https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Flatpak/Flatpak-AutoUpdate-Setup.sh"
-wget -q -O /tmp/Flatpak-AutoUpdate-Setup.sh "$FLATPAK_AUTOUPDATE_URL"
-chmod +x /tmp/Flatpak-AutoUpdate-Setup.sh
-
-for user in $(loginctl list-sessions --no-legend --value | awk '{print $1}'); do
-    USER_UID=$(id -u "$user" 2>/dev/null || continue)
-    DBUS_ADDRESS="unix:path=/run/user/$USER_UID/bus"
-    if [ -S "/run/user/$USER_UID/bus" ]; then
-        su - "$user" -c "bash /tmp/Flatpak-AutoUpdate-Setup.sh"
-    fi
-done
-
-rm -f /tmp/Flatpak-AutoUpdate-Setup.sh
-
-# --- 5. NetworkManager Connectivity Fix ---
-info "Disabling NetworkManager connectivity check..."
-NM_DIR_ETC="/etc/NetworkManager/conf.d"
-NM_FILE_ETC="${NM_DIR_ETC}/20-connectivity-fedora.conf"
-
-mkdir -p "$NM_DIR_ETC"
-if [[ -e "$NM_FILE_ETC" ]]; then
-    cp -n "$NM_FILE_ETC" "${NM_FILE_ETC}.bak" || warn "Failed to back up NetworkManager config."
-fi
-
-printf '[connectivity]\nenabled=false\n' > "$NM_FILE_ETC"
-systemctl restart NetworkManager
-
-# --- 6. Final System Upgrade ---
-info "Performing final system upgrade..."
-sleep 5
-rpm-ostree upgrade
-
-# --- 7. Update time ---
-set_locale_time() {
-    echo "Attempting to set LC_TIME to C.UTF-8..."
-    if sudo localectl set-locale LC_TIME=C.UTF-8; then
-        echo "Successfully set LC_TIME."
+    local msg="$1"
+    shift
+    if "$@"; then
+        info "$msg: Success."
     else
-        echo "Error: Failed to set the locale time. Check if you have permission or if the command is correct." >&2
+        warn "$msg: Failed."
         return 1
     fi
 }
 
-set_locale_time
+# --- Configuration Variables ---
+FLATPAK_APPS=(
+    "com.brave.Browser"
+    "org.videolan.VLC"
+    "org.jellyfin.JellyfinDesktop"
+    "org.localsend.localsend_app"
+    "io.github.kolunmi.Bazaar"
+    "com.unicornsonlsd.finamp"
+)
 
-info "Setup Complete! Rebooting now."
-sleep 5
-reboot
+KDE_BLOAT=(
+    "org.kde.elisa"
+    "org.kde.kmahjongg"
+    "org.kde.kolourpaint"
+    "org.kde.kmines"
+)
+
+NM_CONF_DIR="/etc/NetworkManager/conf.d"
+NM_CONF_FILE="${NM_CONF_DIR}/20-connectivity-fedora.conf"
+
+# --- 1. Flatpak Remote Configuration ---
+info "Configuring Flatpak remotes..."
+
+# Ensure flathub is present before attempting installation
+if ! flatpak remote-exists flathub; then
+    info "Adding Flathub remote..."
+    flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+fi
+
+# Disable Fedora-specific remotes to prevent package conflicts
+sudo flatpak remote-modify --disable fedora-testing 2>/dev/null || warn "fedora-testing remote not found."
+sudo flatpak remote-modify --disable fedora 2>/dev/null || warn "fedora remote not found."
+
+# --- 2. Application Management: Cleanup ---
+info "Cleaning up default KDE apps..."
+for app in "${KDE_BLOAT[@]}"; do
+    if flatpak list --app | grep -q "$app"; then
+        info "Removing $app..."
+        flatpak remove -y "$app" || warn "Failed to remove $app."
+    fi
+done
+
+# --- 3. Application Management: Installation ---
+info "Installing core Flatpaks..."
+for app in "${FLATPAK_APPS[@]}"; do
+    try "Installing $app" flatpak install -y flathub "$app"
+done
+
+# Ensure all apps/runtimes are fully up to date
+info "Running final Flatpak update cycle..."
+flatpak update -y
+sudo flatpak --system update -y
+
+# --- 4. NetworkManager Connectivity Fix ---
+info "Disabling NetworkManager connectivity check (prevents boot delays)..."
+sudo mkdir -p "$NM_CONF_DIR"
+if [[ -e "$NM_CONF_FILE" ]]; then
+    sudo cp -n "$NM_CONF_FILE" "${NM_CONF_FILE}.bak" || warn "Failed to backup NetworkManager config."
+fi
+echo -e '[connectivity]\nenabled=false' | sudo tee "$NM_CONF_FILE" > /dev/null
+sudo systemctl restart NetworkManager
+
+# --- 5. System Locale Configuration ---
+info "Setting LC_TIME to C.UTF-8 for consistent formatting..."
+if sudo localectl set-locale LC_TIME=C.UTF-8; then
+    info "Locale time updated."
+else
+    error "Failed to set locale time."
+fi
+
+# --- 6. rpm-ostree Automation & Upgrades ---
+info "Configuring rpm-ostree automatic updates..."
+# Configure the daemon to stage updates in the background
+sudo tee /etc/rpm-ostreed.conf <<EOF > /dev/else
+[Daemon]
+AutomaticUpdatePolicy=stage
+EOF
+
+sudo systemctl enable --now rpm-ostree-automatic.timer
+sudo systemctl reload rpm-ostreed 2>/dev/null || warn "rpm-ostreed reload failed (service may not be active)."
+
+info "Performing final system upgrade..."
+# Note: This may require a reboot to apply changes
+sudo rpm-ostree upgrade
+
+# --- 7. User Autostart Configuration ---
+info "Creating user autostart script for post-boot updates..."
+AUTOSTART_DIR="$HOME/.config/autostart"
+AUTOSTART_SCRIPT="$AUTOSTART_DIR/flatup.desktop"
+INTERNAL_SH_PATH="$HOME/.local/bin/flatup_executor.sh"
+
+mkdir -p "$AUTOSTART_DIR"
+mkdir -p "$HOME/.local/bin"
+
+# Create the actual executor script that runs after login
+cat <<'EOF' > "$INTERNAL_SH_PATH"
+#!/bin/bash
+# Wait for desktop environment to settle
+sleep 30
+# Perform background update and notify via notify-send (if available)
+flatpak update -y && notify-send "Flatpak Update" "Post-boot updates completed successfully." || notify-send "Flatpak Update" "Post-boot update failed. Check logs."
+EOF
+chmod +x "$INTERNAL_SH_PATH"
+
+# Create the .desktop entry for autostart
+cat <<EOF > "$AUTOSTART_SCRIPT"
+[Desktop Entry]
+Type=Application
+Name=Flatpak Post-Boot Updater
+Exec=$INTERNAL_SH_PATH
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Comment=Ensures Flatpaks are updated shortly after login.
+EOF
+
+info "Setup Complete! Please reboot your system to apply all changes."
