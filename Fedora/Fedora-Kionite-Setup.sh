@@ -59,11 +59,13 @@ info "Running initial Flatpak update..."
 flatpak update -y
 flatpak --system update -y
 
-# Send notification to all logged-in users
-for user in $(who | awk '{print $1}' | sort -u); do
-    USER_UID=$(id -u "$user")
+# Send notification ONLY to users with an active desktop session
+for user in $(loginctl list-sessions --no-legend --value | awk '{print $1}'); do
+    USER_UID=$(id -u "$user" 2>/dev/null || continue)
     DBUS_ADDRESS="unix:path=/run/user/$USER_UID/bus"
-    su - "$user" -c "DBUS_SESSION_BUS_ADDRESS=$DBUS_ADDRESS notify-send 'Flatpak Update' 'Your Flatpaks have been updated during setup.'"
+    if [ -S "/run/user/$USER_UID/bus" ]; then
+        su - "$user" -c "DBUS_SESSION_BUS_ADDRESS=$DBUS_ADDRESS notify-send 'Flatpak Update' 'Your Flatpaks have been updated during setup.'"
+    fi
 done
 
 # --- 2. Brave Debloat ---
@@ -107,11 +109,13 @@ fi
 # Update system Flatpaks
 /usr/bin/flatpak --system update -y
 
-# Send notification to all logged-in users
-for user in $(who | awk '{print $1}' | sort -u); do
-    USER_UID=$(id -u "$user")
+# Send notification ONLY to users with an active desktop session
+for user in $(loginctl list-sessions --no-legend --value | awk '{print $1}'); do
+    USER_UID=$(id -u "$user" 2>/dev/null || continue)
     DBUS_ADDRESS="unix:path=/run/user/$USER_UID/bus"
-    su - "$user" -c "DBUS_SESSION_BUS_ADDRESS=$DBUS_ADDRESS notify-send 'Flatpak Update' 'Your system Flatpaks have been updated.'"
+    if [ -S "/run/user/$USER_UID/bus" ]; then
+        su - "$user" -c "DBUS_SESSION_BUS_ADDRESS=$DBUS_ADDRESS notify-send 'Flatpak Update' 'Your system Flatpaks have been updated.'"
+    fi
 done
 
 # Record the last run time
