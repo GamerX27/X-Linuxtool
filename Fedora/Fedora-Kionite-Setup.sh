@@ -11,7 +11,7 @@ trap 'echo -e "\nProcess interrupted. Exiting."; exit 1' SIGINT SIGTERM
 
 # Functions to handle the logging used in your code
 info() { echo -e "[INFO] $1"; }
-warn() { echo -e "[WARN] $arg" >&2; }
+warn() { echo -e "[WARN] $1" >&2; }
 try() {
     local msg="$1"
     shift
@@ -26,38 +26,38 @@ try() {
 # --- Configuration ---
 APPS_TO_REMOVE=(org.kde.elisa org.kde.kmahjongg org.kde.kolourpaint org.kde.kmines)
 APPS_TO_INSTALL=(
-    com.brave.Browser 
-    org.videolan.VLC 
-    org.jellyfin.JellyfinDesktop 
-    org.localsend.localsend_app 
-    io.github.kolunmi.Bazaar 
+    com.brave.Browser
+    org.videolan.VLC
+    org.jellyfin.JellyfinDesktop
+    org.localsend.localsend_app
+    io.github.kolunmi.Bazaar
     com.unicornsonlsd.finamp
 )
 
 # --- Flatpak Remote Configuration ---
 info "Configuring Flatpak remotes..."
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-flatpak remote-modify --disable fedora-testing || warn "Failed to disable fedora-testing remote (may not exist)."
-flatpak remote-modify --disable fedora || warn "Failed to disable fedora remote (may not exist)."
+flatpak remote-modify --disable fedora-testing 2>/dev/null || warn "Failed to disable fedora-testing remote (may not exist)."
+flatpak remote-modify --disable fedora 2>/dev/null || warn "Failed to disable fedora remote (may not exist)."
 
 # --- App Cleanup ---
 info "Cleaning up default KDE apps..."
 for app in "${APPS_TO_REMOVE[@]}"; do
     if flatpak list --app | grep -q "$app"; then
-        flatpak remove -y "$app" || warn "Failed to remove $app (may not be installed)."
+        flatpak remove --noninteractive "$app" || warn "Failed to remove $app (may not be installed)."
     fi
 done
 
 # --- Install Apps ---
 info "Installing core Flatpaks..."
 for app in "${APPS_TO_INSTALL[@]}"; do
-    try "Installing $app" flatpak -y install flathub "$app"
+    try "Installing $app" flatpak install --assumeyes flathub "$app"
 done
 
 # --- Update Flatpaks ---
 info "Running initial Flatpak update..."
-flatpak update -y
-flatpak --system update -lag
+flatpak update --noninteractive
+flatpak --system update --noninteractive 2>/dev/null || warn "Failed to update system Flatpaks (may not be applicable)."
 
 # --- NetworkManager Connectivity Fix ---
 info "Disabling NetworkManager connectivity check..."
@@ -81,22 +81,25 @@ systemctl enable --now rpm-ostree-automatic.timer
 
 # --- Final System Upgrade ---
 info "Performing final system upgrade..."
-sleep 5
-rpm-ostree upgrade
+rpm-ostree upgrade --allow-downgrade
 
 # --- Update time ---
 set_locale_time() {
     echo "Attempting to set LC_TIME to C.UTF-8..."
-    if localectl set-locale LC_TIME=C.UTF-8; then
-        echo "Successfully set LC_TIME."
+    if localectl list-locales | grep -q "C.UTF-8"; then
+        if localectl set-locale LC_TIME=C.UTF-8; then
+            echo "Successfully set LC_TIME."
+        else
+            echo "Error: Failed to set the locale time." >&2
+            return 1
+        fi
     else
-        echo "Error: Failed to set the locale time." >&2
-        return 1
+        warn "C.UTF-8 locale not available. Skipping."
     fi
 }
 set_locale_time
 
 # --- Shutdown Sequence ---
-info "Setup Complete! Rebooting now."
+info "Setup Complete! Rebooting in 5 seconds. Press Ctrl+C to cancel."
 sleep 5
 reboot
