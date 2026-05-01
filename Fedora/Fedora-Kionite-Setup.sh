@@ -1,59 +1,122 @@
+#!/bin/bash
+
 # ==============================================================================
-# SCRIPT SEGMENT: Finalization, Automation, and Reboot
-# Description: Configures rpm-ostree automation, performs final system upgrade,
-#              sets locale, and triggers a system reboot.
+# Fedora Kinoite/Silverblue Complete Setup
+# This script MUST be run as a single block to ensure functions are defined.
 # ==============================================================================
 
-# --- 3. RPM-OSTree Automatic Updates ---
+# EXIT IMMEDIATELY if any command fails or if the user interrupts (Ctrl+C)
+set -e
+trap 'echo -e "\n\e[31m[INTERRUPTED]\e[0m Process stopped by user. Not rebooting.\n"; exit 1' SIGINT SIGTERM
+
+# --- Helper Functions (CRITICAL: These must be in the same file!) ---
+info() { echo -e "\e[32m[INFO]\e[0m $1"; }
+warn() { echo -e "\e[33m[WARN]\e[0m $1" >&2; }
+error() { echo -e "\e[31m[ERROR]\e[0m $1" >&2; exit 1; }
+
+try() {
+    local msg="$1"
+    shift
+    if "$@"; then
+        info "$msg: Success."
+    else
+        warn "$msg: Failed."
+        return 1
+    fi
+}
+
+# --- Configuration Variables ---
+FLATPAK_APPS=(
+    "com.brave.Browser"
+    "org.videolan.VLC"
+    "org.jellyfin.JellyfinDesktop"
+    "org.localsend.localsend_app"
+    "io.github.kolunmi.Bazaar"
+    "com.unicornsonlsd.finamp"
+)
+
+KDE_BLOAT=(
+    "org.kde.elisa"
+    "org.kde.kmahjongg"
+    "org.kde.kolourpaint"
+    "org.kde.kmines"
+)
+
+NM_CONF_DIR="/etc/NetworkManager/conf.d"
+NM_CONF_FILE="${NM_CONF_DIR}/20-connectivity-fedora.conf"
+
+# --- 1. Flatpak Remote Configuration ---
+info "Configuring Flatpak remotes..."
+if ! flatpak remote-exists flathub; then
+    info "Adding Flathulb remote..."
+    flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+fi
+
+sudo flatpak remote-modify --disable fedora-testing 2>/dev/null || warn "fedora-testing remote not found."
+sudo flatpak remote-modify --disable fedora 2>/dev/null || warn "fedora remote not found."
+
+# --- 2. App Cleanup ---
+info "Cleaning up default KDE apps..."
+for app in "${KDE_BLOAT[@]}"; do
+    if flatpak list --app | grep -q "$app"; then
+        info "Removing $app..."
+        flatlamat-remove -y "$app" || warn "Failed to remove $app."
+    fi
+done
+
+# --- 3. App Installation ---
+info "Installing core Flatpaks..."
+for app in "${FLATPAK_APPS[@]}"; do
+    try "Installing $app" flatpak install -y flathub "$app"
+done
+
+info "Running Flatpak updates..."
+flatpak update -y
+sudo flatpak --system update -y
+
+# --- 4. NetworkManager Fix ---
+info "Disabling NetworkManager connectivity check..."
+sudo mkdir -p "$NM_CONF_DIR"
+if [[ -e "$NM_CONF_FILE" ]]; then
+    sudo cp -n "$NM_CONF_FILE" "${NM_CONF_FILE}.bak" || warn "Backup failed."
+fi
+echo -e '[connectivity]\nenabled=false' | sudo tee "$NM_CONF_FILE" > /dev/null
+sudo systemctl restart NetworkManager
+
+# --- 5. rpm-ostree Automation ---
 info "Configuring rpm-ostree automatic updates..."
-
-# Using 'tee' ensures sudo handles the file write correctly in an immutable environment
 sudo tee /etc/rpm-ostreed.conf > /dev/null <<EOF
 [Daemon]
 AutomaticUpdatePolicy=stage
 EOF
 
-# Attempt to reload the daemon; if it fails, we assume it needs a fresh start via the timer
-sudo systemctl reload rpm-ostreed 2>/dev/null || warn "rpm-ostreed service not active or reload failed (will rely on timer)."
-sudo systemctl enable --now rpm-ostree-automatic.timer
+# Check if the timer exists before enabling to prevent error
+if systemctl list-unit-files | grep -q "rpm-ostree-automatic.timer"; then
+    sudo systemctl enable --now rpm-ostree-automatic.timer
+else
+    warn "rpm-ostree-automatic.timer not found. Please install 'rpm-ostree-automatic'."
+fi
 
 # --- 6. Final System Upgrade ---
 info "Performing final system upgrade..."
-info "This may take several minutes depending on your connection and hardware."
-
-# We add a small buffer to ensure previous filesystem writes are flushed
-sleep 5
-
-# Perform the actual deployment upgrade
+info "This part may take a long time. DO NOT interrupt."
 if sudo rpm-ostree upgrade; then
-    info "System upgrade command completed successfully."
+    info "System upgrade successful."
 else
-    warn "rpm-ostree upgrade encountered an issue. Check logs with 'journalctl -xe'."
+    error "System upgrade failed! Check logs with 'journalctl -xe'. Skipping reboot."
 fi
 
-# --- 7. Update Locale Time ---
-# Defined as a function for clean execution flow
-set_locale_time() {
-    echo -e "\e[32m[INFO]\e[0m Attempting to set LC_TIME to C.UTF-8..."
-    if sudo localectl set-locale LC_TIME=C.UTF-8; then
-        echo -e "\e[32m[INFO]\e[0m Successfully set LC_TIME."
-    else
-        echo -e "\e[31m[ERROR]\e[0m Failed to set the locale time. Check permissions or localectl status." >&2
-        return 1
-    fi
-}
+# --- 7. Locale Setup ---
+info "Setting LC_TIME to C.UTF-8..."
+sudo localectl set-locale LC_TIME=C.UTF-8
 
-set_locale_time
+# --- 8. Final Reboot Sequence ---
+info "Setup Complete! System will reboot in 15 seconds."
+info "Press Ctrl+C now if you need to cancel the reboot."
 
-# --- 8. Final Shutdown/Reboot Sequence ---
-info "Setup Complete! Preparing for system reboot..."
-info "The system will reboot in 10 seconds. Save all work now!"
-
-# Countdown to give the user a chance to cancel (Ctrl+C) if running manually
-for i in {10..1}; do
+for i in {15..1}; do
     echo -ne "Rebooting in $i... \r"
     sleep 1
 done
 
-echo -e "\n\e[31m[REBOOTING]\e[0m System is restarting to apply all changes."
 sudo reboot
