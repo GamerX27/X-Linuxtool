@@ -101,13 +101,16 @@ set_locale_time
 
 # --- Flatpak Autostart for Updates ---
 info "Setting up Flatpak autostart for updates..."
-mkdir -p ~/.config/autostart
-cat > ~/.config/autostart/flatup <<EOF
+sudo bash -c 'mkdir -p /home/$SUDO_USER/.config/autostart
+cat > /home/$SUDO_USER/.config/autostart/flatup <<"EOF"
 #!/bin/sh
 sleep 30
-flatpak update --noninteractive && notify-send -a "Updater" "Apps updated!"
+if flatpak update --noninteractive | grep -q "Updates complete"; then
+    notify-send -a "Updater" "Apps updated!"
+fi
 EOF
-chmod +x ~/.config/autostart/flatup
+chmod +x /home/$SUDO_USER/.config/autostart/flatup
+chown -R $SUDO_USER:$SUDO_USER /home/$SUDO_USER/.config/autostart'
 
 # --- Shutdown Sequence ---
 info "Setup Complete! Rebooting in 5 seconds. Press Ctrl+C to cancel."
