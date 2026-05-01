@@ -75,71 +75,84 @@ EOF
 systemctl reload rpm-ostreed 2>/dev/null || warn "rpm-ostreed service not active (will be enabled next)."
 systemctl enable --now rpm-ostreed-automatic.timer
 
-# --- 4. Unified Flatpak Auto-Update Timer (System + User) ---
-info "Configuring unified Flatpak autoupdate (system + user)..."
+# --- 4. System Flatpak Auto-Update (with KDE Notifications) ---
+info "Configuring system Flatpak autoupdate..."
 
-# Identify the original user for notifications
-REAL_USER=$(logname)
-USER_UID=$(id -u "$REAL_USER")
-
-# Create a unified update script
-cat << 'EOF' > /usr/local/bin/flatpak-unified-update.sh
+# Create a script to handle the update and notifications
+cat << 'EOF' > /usr/local/bin/system-flatpak-update.sh
 #!/bin/bash
 
-# Run system updates
-/usr/bin/flatpak update --system --noninteractive -y
+# Check if last run was more than 24 hours ago
+LAST_RUN_FILE="/var/lib/flatpak-autoupdate-lastrun"
+NOW=$(date +%s)
+if [ -f "$LAST_RUN_FILE" ]; then
+    LAST_RUN=$(cat "$LAST_RUN_FILE")
+    if [ $(( NOW - LAST_RUN )) -lt 86400 ]; then
+        exit 0
+    fi
+fi
 
-# Run user updates for all users with Flatpak apps
+# Run system updates
+/usr/bin/flatpak --system update -y
+
+# Send notification to all active users via DBUS
 for user_home in /home/* /var/home/*; do
     if [ -d "$user_home" ]; then
         USER_NAME=$(basename "$user_home")
-        USER_UID=$(id -u "$USER_NAME")
-        if [ "$USER_UID" -gt 999 ]; then  # Skip system users
-            echo "Updating Flatpak apps for user: $USER_NAME"
-            sudo -u "$USER_NAME" /usr/bin/flatpak update --user --noninteractive -y
-
-            # Send notification
-            USER_BUS="unix:path=/run/user/$USER_UID/bus"
-            sudo -u "$USER_NAME" DBUS_SESSION_BUS_ADDRESS="$USER_BUS" notify-send "Flatpak Update" "Your Flatpak apps have been updated."
+        if id "$USER_NAME" >/dev/null 2>&1; then
+            USER_UID=$(id -u "$USER_NAME")
+            if [ "$USER_UID" -gt 999 ]; then  # Skip system users
+                USER_BUS="unix:path=/run/user/$USER_UID/bus"
+                # Check if bus exists before sending notification
+                if [ -S "$USER_BUS" ]; then
+                    sudo -u "$USER_NAME" DBUS_SESSION_BUS_ADDRESS="$USER_BUS" notify-send "Flatpak Update" "Your system Flatpaks have been updated."
+                fi
+            fi
         fi
     fi
 done
+
+# Record the last run time
+echo "$NOW" > "$LAST_RUN_FILE"
 EOF
 
-chmod +x /usr/local/bin/flatpak-unified-update.sh
+chmod +x /usr/local/bin/system-flatpak-update.sh
 
-# Create a systemd service for unified updates
-cat << 'EOF' > /etc/systemd/system/flatpak-unified-update.service
+# Create the systemd service file as specified
+cat << 'EOF' > /etc/systemd/system/auto-update-system-flatpaks.service
 [Unit]
-Description=Unified Flatpak Autoupdater (System + User)
+Description=Automatically update system Flatpaks
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/flatpak-unified-update.sh
+ExecStart=/usr/local/bin/system-flatpak-update.sh
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# Create a systemd timer for unified updates
-cat << 'EOF' > /etc/systemd/system/flatpak-unified-update.timer
+# Create the systemd timer file as specified
+cat << 'EOF' > /etc/systemd/system/auto-update-system-flatpaks.timer
 [Unit]
-Description=Run unified Flatpak update daily and after boot
+Description=Daily automatic update of system Flatpaks
 
 [Timer]
 OnCalendar=daily
 Persistent=true
-# RandomizedDelaySec=1h  # Uncomment if you want to spread updates
+OnBootSec=1min
 
 [Install]
 WantedBy=timers.target
 EOF
 
-# Enable the unified timer
+# Enable and start the timer
 systemctl daemon-reload
-systemctl enable --now flatpak-unified-update.timer
+systemctl enable --now auto-update-system-flatpaks.timer
+
+# Initial run to test
+systemctl start auto-update-system-flatpaks.service
 
 # --- 5. NetworkManager Connectivity Fix ---
 info "Disabling NetworkManager connectivity check..."
