@@ -34,6 +34,20 @@ APPS_TO_INSTALL=(
     com.unicornsonlsd.finamp
 )
 
+# --- Brave Debloat ---
+info "Debloating Brave Browser..."
+BRAVE_DEBLOAT_URL="https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Browser/make_brave_great_again.sh"
+wget -q -O /tmp/make_brave_great_again.sh "$BRAVE_DEBLOAT_URL"
+chmod +x /tmp/make_brave_great_again.sh
+if bash /tmp/make_brave_great_again.sh; then
+    echo -e "${GREEN}[OK]${NC} Brave Browser debloat completed."
+else
+    warn "Brave Browser debloat may have failed (non-critical)."
+fi
+rm -f /tmp/make_brave_great_again.sh
+
+
+
 # --- Flatpak Remote Configuration ---
 info "Configuring Flatpak remotes..."
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
