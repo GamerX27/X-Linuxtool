@@ -146,7 +146,7 @@ sudo bash -c 'mkdir -p /home/$SUDO_USER/.config/autostart
 cat > /home/$SUDO_USER/.config/autostart/flatup <<"EOF"
 #!/bin/sh
 sleep 30
-if flatpak update --noninteractive | grep -q "Updates complete"; then
+if flatpak update --noninteractive | grep -q "ID.*Branch.*Op.*Remote"; then
     notify-send -a "Updater" "Apps updated!"
 fi
 EOF
