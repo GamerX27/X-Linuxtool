@@ -127,11 +127,9 @@ dnf install -y chromium torbrowser-launcher
 # ==============================================================================
 echo "Installing Dev Tools..."
 
-# Zed (Flatpak)
-flatpak install flathub dev.zed.Zed -y
-# Grant Zed access to ~/Documents/Code
-flatpak override --user --filesystem=xdg-documents/Code:create dev.zed.Zed
-
+# Zed
+curl -f https://zed.dev/install.sh | sh
+sleep 10
 # ==============================================================================
 # 11. HOSTNAME SETUP
 # ==============================================================================
