@@ -1,8 +1,3 @@
-Here’s the updated script with the **`APPS_TO_REMOVE` and `APPS_TO_INSTALL`** arrays moved **under the Flatpak remote configuration** section, as requested:
-
----
-
-```bash
 #!/bin/bash
 
 # =============================================
