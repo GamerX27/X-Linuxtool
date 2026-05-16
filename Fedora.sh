@@ -4,7 +4,8 @@ echo "Choose a script to run:"
 echo "1) Fedora-Minimal"
 echo "2) Fedora-PostSetup"
 echo "3) Fedora-Kionite-Setup"
-echo -n "Enter your choice (1, 2, or 3): "
+echo "4) Bazzite Setup"
+echo -n "Enter your choice (1, 2, 3, or 4): "
 read choice
 
 case $choice in
@@ -28,6 +29,13 @@ case $choice in
         chmod +x /tmp/Fedora-Kionite-Setup.sh
         /tmp/Fedora-Kionite-Setup.sh
         rm -f /tmp/Fedora-Kionite-Setup.sh
+        ;;
+    4)
+        echo "Downloading and running Bazzite-Setup.sh..."
+        curl -sSL https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Bazzite/Bazzite-Setup.sh -o /tmp/Bazzite-Setup.sh
+        chmod +x /tmp/Bazzite-Setup.sh
+        /tmp/Bazzite-Setup.sh
+        rm -f /tmp/Bazzite-Setup.sh
         ;;
     *)
         echo "Invalid choice. Exiting."
