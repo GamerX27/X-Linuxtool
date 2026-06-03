@@ -5,21 +5,28 @@
 echo "Choose a script to run:"
 echo "1) Install Docker"
 echo "2) Auto Update setup"
-echo -n "Enter your choice (1 or 2): "
+echo "3) Docker Compose Updater"
+echo -n "Enter your choice (1, 2 or 3): "
 read choice
 
 case $choice in
     1)
         echo "Running Install Docker"
-        wget http://codeberg.org/X27/X27-Homelab-ToolBox/raw/branch/main/Servers/Docker-Install.sh
+        wget https://codeberg.org/X27/X27-Homelab-ToolBox/raw/branch/main/Scripts/Docker/Docker-Install.sh
         sudo bash Docker-Install.sh
         sudo rm Docker-Install.sh
         ;;
     2)
         echo "Running Server-Updater.sh..."
-        wget https://codeberg.org/X27/X27-Homelab-ToolBox/raw/branch/main/Servers/Server-Updater.sh
+        wget https://codeberg.org/X27/X27-Homelab-ToolBox/raw/branch/main/Scripts/Server-Updater.sh
         sudo bash Server-Updater.sh
         sudo rm Server-Updater.sh
+        ;;
+    3)
+        echo "Running Docker-Compose-Updater.sh..."
+        wget https://codeberg.org/X27/X27-Homelab-ToolBox/raw/branch/main/Scripts/Docker/Docker-Compose-Updater.sh
+        sudo bash Docker-Compose-Updater.sh
+        sudo rm Docker-Compose-Updater.sh
         ;;
     *)
         echo "Invalid choice. Exiting."
