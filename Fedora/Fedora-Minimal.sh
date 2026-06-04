@@ -41,8 +41,8 @@ dnf install rpmfusion-\*-appstream-data
 # ==============================================================================
 # 5. HARDWARE ACCELERATION
 # ==============================================================================
-dnf swap ffmpeg-free ffmpeg --allowerasing
-dnf update @multimedia --setopt="install_weak_deps=False" --exclude=PackageKit-gstreamer-plugin
+dnf swap -y ffmpeg-free ffmpeg --allowerasing
+dnf update -y @multimedia --setopt="install_weak_deps=False" --exclude=PackageKit-gstreamer-plugin
 
 
 
