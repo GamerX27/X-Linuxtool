@@ -50,10 +50,10 @@ dnf update -y @multimedia --setopt="install_weak_deps=False" --exclude=PackageKi
 
 swap_amd() {
     echo "Swapping to AMD drivers..."
-    dnf swap -y mesa-va-drivers mesa-va-drivers-freeworld
-    dnf swap -y mesa-vdpau-drivers mesa-vdpau-drivers-freeworld
-    dnf swap -y mesa-va-drivers.i686 mesa-va-drivers-freeworld.i686
-    dnf swap -y mesa-vdpau-drivers.i686 mesa-vdpau-drivers-freeworld.i686
+    dnf install mesa-va-drivers-freeworld
+    dnf install mesa-va-drivers-freeworld.i686
+
+
 }
 
 swap_intel() {
