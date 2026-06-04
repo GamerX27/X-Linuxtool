@@ -32,17 +32,22 @@ systemctl set-default graphical.target
 # 4. RPM FUSION REPOSITORIES
 # ==============================================================================
 echo "Installing RPM Fusion repositories..."
-dnf install -y \
-https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
-https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-notfree-release-$(rpm -E %fedora).noarch.rpm
-
+dnf install https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+dnf config-manager setopt fedora-cisco-openh264.enabled=1
 dnf update -y @core
 dnf install -y libavcodec-freeworld
 dnf group install -y multimedia
-
+dnf install rpmfusion-\*-appstream-data
 # ==============================================================================
 # 5. HARDWARE ACCELERATION
 # ==============================================================================
+dnf swap ffmpeg-free ffmpeg --allowerasing
+dnf update @multimedia --setopt="install_weak_deps=False" --exclude=PackageKit-gstreamer-plugin
+
+
+
+
+
 swap_amd() {
     echo "Swapping to AMD drivers..."
     dnf swap -y mesa-va-drivers mesa-va-drivers-freeworld
