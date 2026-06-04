@@ -25,7 +25,7 @@ dnf update --refresh && dnf upgrade -y
 # ==============================================================================
 echo "Installing KDE Desktop..."
 dnf group install -y kde-desktop
-systemctl enable sddm
+# systemctl enable sddm
 systemctl set-default graphical.target
 
 # ==============================================================================
