@@ -133,7 +133,7 @@ dnf install -y chromium torbrowser-launcher
 echo "Installing Dev Tools..."
 
 # Zed
-curl -f https://zed.dev/install.sh | sh
+# curl -f https://zed.dev/install.sh | sh
 sleep 10
 # ==============================================================================
 # 11. HOSTNAME SETUP
