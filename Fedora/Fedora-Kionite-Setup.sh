@@ -137,22 +137,10 @@ set_locale_time
 # =============================================
 
 info "Setting up Flatpak autostart for updates..."
-sudo bash -c 'mkdir -p /home/$SUDO_USER/.config/autostart
-cat > /home/$SUDO_USER/.config/autostart/flatup <<"EOF"
-#!/bin/sh
-sleep 30
-if flatpak update --noninteractive | grep -q "ID.*Branch.*Op.*Remote"; then
-    notify-send -a "Updater" "Apps updated!"
-fi
-EOF
-chmod +x /home/$SUDO_USER/.config/autostart/flatup
-chown -R $SUDO_USER:$SUDO_USER /home/$SUDO_USER/.config/autostart'
+wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Flatpak/Flatpak-AutoUpdate-Setup.sh
+sudo bash Flatpak-AutoUpdate-Setup.sh
+rm Flatpak-AutoUpdate-Setup.sh
 
-# =============================================
-# FINISH
-# =============================================
-
-info "Setup Complete! Rebooting in 5 seconds. Press Ctrl+C to cancel."
 sleep 5
 reboot
 ```

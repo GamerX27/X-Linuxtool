@@ -1,71 +1,61 @@
 #!/bin/bash
 
-# Define paths
-BIN_DIR="$HOME/.local/bin"
-SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
-SCRIPT_PATH="$BIN_DIR/flatpak-autoupdate.sh"
-SERVICE_PATH="$SYSTEMD_USER_DIR/flatpak-update.service"
-TIMER_PATH="$SYSTEMD_USER_DIR/flatpak-update.timer"
+# Stop script immediately if any command fails
+set -e
 
-# Create directories if they do not exist
-mkdir -p "$BIN_DIR"
-mkdir -p "$SYSTEMD_USER_DIR"
+SERVICE_FILE="/etc/systemd/system/flatpak-update.service"
+TIMER_FILE="/etc/systemd/system/flatpak-update.timer"
 
-# Create the actual update logic script
-cat << 'EOF' > "$SCRIPT_PATH"
-#!/bin/bash
-
-# Run the flatpak update command and capture both output and errors
-output=$(flatpak update -y 2>&1)
-exit_code=$?
-
-if [ $exit_code -eq 0 ]; then
-    # If everything went well, send a success notification
-    notify-send "Flatpak Update" "All applications are up to date."
-else
-    # Extract the first line of error for the notification to avoid text overflow
-    error_summary=$(echo "$output" | head -n 1)
-    notify-send "Flatpak Update Error" "An error occurred: $error_summary"
+# Check if we have root privileges (needed to write to /etc/)
+if [[ $EUID -ne 0 ]]; then
+   echo "This script must be run as root (use sudo)."
+   exit 1
 fi
-EOF
 
-# Make the logic script executable
-chmod +x "$SCRIPT_PATH"
+# 1. Check if files already exist
+if [ -f "$SERVICE_FILE" ] && [ -f "$TIMER_FILE" ]; then
+    echo "Flatpak auto-update service and timer already exist. Skipping deployment."
+    exit 0
+fi
 
-# Create the systemd service file
-cat << EOF > "$SERVICE_PATH"
+# 2. Create the systemd service file
+echo "Creating service file..."
+cat <<EOF > "$SERVICE_FILE"
 [Unit]
-Description=Update Flatpaks automatically
+Description=Update Flatpaks at boot
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=$SCRIPT_PATH
+ExecStart=/usr/bin/flatpak update -y
+RemainAfterExit=yes
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target
 EOF
 
 # Create the systemd timer file
-# OnCalendar=daily ensures it runs every day
-# OnBootSec=15min ensures that if the machine was just turned on, it waits 15 minutes
-cat << EOF > "$TIMER_PATH"
+echo "Creating timer file..."
+cat <<EOF > "$TIMER_FILE"
 [Unit]
-Description=Run Flatpak update daily and 15 minutes after boot
+Description=Run Flatpak update 30 seconds after boot
 
 [Timer]
-OnCalendar=daily
-OnBootSec=15min
-Persistent=true
+OnBootSec=30s
+Persistent=false
 
 [Install]
 WantedBy=timers.target
 EOF
 
-# Reload the systemd user daemon to recognize new files
-systemctl --user daemon-reload
+# Reload systemd to recognize new files
+echo "Reloading systemd daemon..."
+systemctl daemon-reload
 
 # Enable and start the timer
-systemctl --user enable flatpak-update.timer
-systemctl --user start flatpak-update.timer
+echo "Enabling and starting the timer..."
+systemctl enable --now flatpak-update.timer
 
-echo "Setup complete. The Flatpak auto-updater is now active."
+# 3. Final confirmation
+echo "Flatpak auto-update service and timer deployed successfully."
