@@ -133,7 +133,7 @@ dnf install -y chromium torbrowser-launcher
 echo "Installing Dev Tools..."
 
 # Zed
-# curl -f https://zed.dev/install.sh | sh
+curl -f https://zed.dev/install.sh | sh
 sleep 10
 # ==============================================================================
 # 11. HOSTNAME SETUP
@@ -172,6 +172,8 @@ echo "Installing Flatpak applications..."
 wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Flatpak/flatpaks.sh
 bash flatpaks.sh
 rm -f flatpaks.sh
+flatpak remote-modify fedora --disable
+flatpak remote-modify fedora-testing --disable
 
 # ==============================================================================
 # 14. Set Locale to 24 Hour
