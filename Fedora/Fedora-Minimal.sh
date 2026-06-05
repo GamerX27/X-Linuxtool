@@ -45,9 +45,6 @@ dnf swap -y ffmpeg-free ffmpeg --allowerasing
 dnf update -y @multimedia --setopt="install_weak_deps=False" --exclude=PackageKit-gstreamer-plugin
 
 
-
-
-
 swap_amd() {
     echo "Swapping to AMD drivers..."
     dnf install -y mesa-va-drivers-freeworld
@@ -84,8 +81,8 @@ esac
 # 6. UTILITIES & CORE APPS
 # ==============================================================================
 echo "Installing system utilities and core apps..."
-dnf install wget fastfetch fish htop nano papirus-icon-theme curl lspci sensors -y
-dnf install vlc nextcloud-client easyeffects gnome-disk-utility libreoffice-writer -y
+dnf install -y wget fastfetch fish htop nano papirus-icon-theme curl lspci sensors
+dnf install -y vlc nextcloud-client easyeffects gnome-disk-utility libreoffice-writer gwenview
 dnf remove -y dragon juk elisa-player kmail khelpcenter
 
 # ==============================================================================
@@ -175,6 +172,7 @@ rm -f flatpaks.sh
 flatpak remote-modify fedora --disable
 flatpak remote-modify fedora-testing --disable
 
+flatpak install -y flathub com.vivaldi.Vivaldi
 # ==============================================================================
 # 14. Set Locale to 24 Hour
 # ==============================================================================
