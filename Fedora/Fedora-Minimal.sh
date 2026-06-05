@@ -125,15 +125,7 @@ dnf install -y librewolf
 dnf install -y chromium torbrowser-launcher
 
 # ==============================================================================
-# 10. DEV TOOLS
-# ==============================================================================
-echo "Installing Dev Tools..."
-
-# Zed
-curl -f https://zed.dev/install.sh | sh
-sleep 10
-# ==============================================================================
-# 11. HOSTNAME SETUP
+# 10. HOSTNAME SETUP
 # ==============================================================================
 echo ""
 read -p "Enter the new hostname for your Fedora system: " new_hostname < /dev/tty
@@ -148,7 +140,7 @@ else
 fi
 
 # ==============================================================================
-# 12. GAMING PACKAGES
+# 11. GAMING PACKAGES
 # ==============================================================================
 echo ""
 read -p "Do you want to install Gaming Packages? (yes/no): " gaming_choice < /dev/tty
@@ -163,7 +155,7 @@ else
 fi
 
 # ==============================================================================
-# 13. FLATPAKS
+# 12. FLATPAKS
 # ==============================================================================
 echo "Installing Flatpak applications..."
 wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Flatpak/flatpaks.sh
@@ -174,7 +166,7 @@ flatpak remote-modify fedora-testing --disable
 
 flatpak install -y flathub com.vivaldi.Vivaldi
 # ==============================================================================
-# 14. Set Locale to 24 Hour
+# 13. Set Locale to 24 Hour
 # ==============================================================================
 set_locale_time() {
     echo "Attempting to set LC_TIME to C.UTF-8..."
@@ -189,7 +181,7 @@ set_locale_time() {
 set_locale_time
 
 # ==============================================================================
-# 15. SECURITY & CLEANUP
+# 14. SECURITY & CLEANUP
 # ==============================================================================
 echo "Securing system (Disabling OpenSSH)..."
 systemctl stop sshd
