@@ -6,5 +6,5 @@ flatpak install -y flathub \
         com.github.zocker_160.SyncThingy \
         org.jellyfin.JellyfinDesktop \
         com.unicornsonlsd.finamp \
-        org.gnome.World.Iotas
-
+        org.gnome.World.Iotas \
+        io.github.mfat.sshpilot
