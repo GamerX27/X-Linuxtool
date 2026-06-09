@@ -51,7 +51,8 @@ echo "5) Kron4ek Wine Installer"
 echo "6) Proton CachyOS Installer"
 echo "7) Gigabyte Sleep Fix"
 echo "8) Custom Fastfetch Config"
-read -p "Enter your choice (1, 2, 3, 4, 5, 6, 7, or 8): " choice
+echo "9) Virtualization Setup"
+read -p "Enter your choice (1, 2, 3, 4, 5, 6, 7, 8, or 9): " choice
 
 case $choice in
     1)
@@ -101,6 +102,12 @@ case $choice in
         wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Tools/fsfetch.sh
         bash fsfetch.sh
         rm fsfetch.sh
+        ;;
+    9)
+        echo "Downloading and running Virtualization Setup..."
+        wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Tools/Virtualization_Setup.sh
+        sudo bash Virtualization_Setup.sh
+        sudo rm Virtualization_Setup.sh
         ;;
     *)
         echo "Invalid choice. Exiting."
