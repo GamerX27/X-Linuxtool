@@ -19,7 +19,7 @@
 #  13. Optionally install the Zed editor.
 #  14. Clean up orphaned packages and optionally reboot.
 #
-# Usage: ./Fedora-PostSetup.sh
+# Usage: sudo ./Fedora-PostSetup.sh   (must be run as root)
 #
 
 set -euo pipefail
@@ -41,9 +41,19 @@ require_cmd() {
     fi
 }
 
+# Run a command as the non-root user who invoked sudo. Falls back to running
+# the command directly when no such user is known (e.g. a pure-root login).
+run_as_user() {
+    if [[ -n "${REAL_USER}" ]]; then
+        runuser -u "${REAL_USER}" -- env HOME="${REAL_HOME}" "$@"
+    else
+        "$@"
+    fi
+}
+
 set_locale_time() {
     echo "Attempting to set LC_TIME to C.UTF-8..."
-    if sudo localectl set-locale LC_TIME=C.UTF-8; then
+    if localectl set-locale LC_TIME=C.UTF-8; then
         echo "Successfully set LC_TIME."
     else
         echo "Error: Failed to set the locale time. Check if you have permission or if the command is correct." >&2
@@ -53,12 +63,11 @@ set_locale_time() {
 
 # --- Pre-flight checks ------------------------------------------------------
 
-if [[ "${EUID}" -eq 0 ]]; then
-    err "Do not run this script as root. It will call sudo when needed."
+if [[ "${EUID}" -ne 0 ]]; then
+    err "This script must be run as root. Re-run it with: sudo $0"
     exit 1
 fi
 
-require_cmd sudo
 require_cmd dnf
 require_cmd rpm
 
@@ -66,39 +75,48 @@ require_cmd rpm
 FEDORA_VERSION="$(rpm -E %fedora)"
 log "Detected Fedora ${FEDORA_VERSION}"
 
-# Keep the sudo timestamp alive for the duration of the script.
-sudo -v
+# Identify the non-root user who invoked sudo, used for per-user steps
+# (Flatpak apps and the Zed editor) so they install for the real user.
+REAL_USER="${SUDO_USER:-}"
+if [[ -n "${REAL_USER}" && "${REAL_USER}" != "root" ]]; then
+    REAL_HOME="$(getent passwd "${REAL_USER}" | cut -d: -f6)"
+    log "Per-user steps will run as: ${REAL_USER}"
+else
+    REAL_USER=""
+    REAL_HOME=""
+    err "No invoking user detected (running as pure root); per-user steps will run as root."
+fi
 
 # --- 1. Refresh and upgrade -------------------------------------------------
 
 log "Refreshing metadata and upgrading the system"
-sudo dnf update --refresh -y
-sudo dnf upgrade -y
+dnf update --refresh -y
+dnf upgrade -y
 
 # --- 2. Enable RPM Fusion (free + nonfree) ----------------------------------
 
 log "Enabling RPM Fusion (free + nonfree) repositories"
-sudo dnf install -y \
+dnf install -y \
     "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${FEDORA_VERSION}.noarch.rpm" \
     "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FEDORA_VERSION}.noarch.rpm"
 
 # --- 3. Enable Cisco OpenH264 -----------------------------------------------
 
 log "Enabling the Cisco OpenH264 repository"
-sudo dnf config-manager setopt fedora-cisco-openh264.enabled=1
+dnf config-manager setopt fedora-cisco-openh264.enabled=1
 
 # --- 4. Update @core --------------------------------------------------------
 
 log "Updating the @core package group"
-sudo dnf update -y @core
+dnf update -y @core
 
 # --- 5. Multimedia ----------------------------------------------------------
 
 log "Switching to the full ffmpeg build"
-sudo dnf swap ffmpeg-free ffmpeg --allowerasing -y
+dnf swap ffmpeg-free ffmpeg --allowerasing -y
 
 log "Installing additional multimedia codecs"
-sudo dnf update -y @multimedia --setopt="install_weak_deps=False" --exclude=PackageKit-gstreamer-plugin
+dnf update -y @multimedia --setopt="install_weak_deps=False" --exclude=PackageKit-gstreamer-plugin
 
 # --- 6. Hardware-accelerated codecs -----------------------------------------
 
@@ -113,17 +131,17 @@ read -rp "Enter choice [1/2/3/4]: " gpu_choice
 case "${gpu_choice}" in
     1)
         log "Installing Intel (recent) hardware-accelerated codecs"
-        sudo dnf install -y intel-media-driver
+        dnf install -y intel-media-driver
         ;;
     2)
         log "Installing Intel (older) hardware-accelerated codecs"
-        sudo dnf install -y libva-intel-driver
+        dnf install -y libva-intel-driver
         ;;
     3)
         log "Installing AMD hardware-accelerated codecs"
-        sudo dnf install -y mesa-va-drivers-freeworld
+        dnf install -y mesa-va-drivers-freeworld
         # 32-bit compat libraries (useful for Steam / Wine).
-        sudo dnf install -y mesa-va-drivers-freeworld.i686
+        dnf install -y mesa-va-drivers-freeworld.i686
         ;;
     *)
         log "Skipping hardware-accelerated codec installation"
@@ -133,34 +151,35 @@ esac
 # --- 7. Base packages -------------------------------------------------------
 
 log "Removing unwanted default applications"
-sudo dnf remove -y dragon juk elisa-player kmail khelpcenter kmahjongg kmines kpat 'libreoffice*'
+dnf remove -y dragon juk elisa-player kmail khelpcenter kmahjongg kmines kpat 'libreoffice*'
 
 log "Installing base command-line tools"
 # Note: lspci ships in pciutils, sensors ships in lm_sensors.
-sudo dnf install -y wget fastfetch fish htop nano papirus-icon-theme curl pciutils lm_sensors
+dnf install -y wget fastfetch fish htop nano papirus-icon-theme curl pciutils lm_sensors
 
 log "Installing base applications"
-sudo dnf install -y vlc nextcloud-client easyeffects gnome-disk-utility libreoffice-writer gwenview
+dnf install -y vlc nextcloud-client easyeffects gnome-disk-utility libreoffice-writer gwenview
 
 # --- 8. Flatpaks ------------------------------------------------------------
 
 log "Adding the Flathub remote"
 require_cmd flatpak
-flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+run_as_user flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
 log "Running the Flatpak app install script"
 FLATPAKS_SCRIPT="$(mktemp /tmp/flatpaks.XXXXXX.sh)"
 wget -O "${FLATPAKS_SCRIPT}" \
     https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Flatpak/flatpaks.sh
-bash "${FLATPAKS_SCRIPT}"
+chmod a+r "${FLATPAKS_SCRIPT}"
+run_as_user bash "${FLATPAKS_SCRIPT}"
 rm -f "${FLATPAKS_SCRIPT}"
 
 log "Disabling the Fedora Flatpak remotes"
-flatpak remote-modify fedora --disable
-flatpak remote-modify fedora-testing --disable
+run_as_user flatpak remote-modify fedora --disable
+run_as_user flatpak remote-modify fedora-testing --disable
 
 log "Installing Vivaldi (Flatpak)"
-flatpak install -y flathub com.vivaldi.Vivaldi
+run_as_user flatpak install -y flathub com.vivaldi.Vivaldi
 
 # --- 9. Disable NetworkManager connectivity check ---------------------------
 
@@ -168,14 +187,14 @@ log "Disabling the NetworkManager connectivity check"
 # An empty connectivity URI disables the check. We write the override to /etc
 # (the proper override location) so it persists across updates and survives the
 # removal of the vendor connectivity config package below.
-sudo mkdir -p /etc/NetworkManager/conf.d
-sudo tee /etc/NetworkManager/conf.d/20-connectivity-fedora.conf >/dev/null <<'EOF'
+mkdir -p /etc/NetworkManager/conf.d
+tee /etc/NetworkManager/conf.d/20-connectivity-fedora.conf >/dev/null <<'EOF'
 [connectivity]
 uri=
 EOF
 
-sudo dnf remove -y NetworkManager-config-connectivity-fedora
-sudo systemctl restart NetworkManager
+dnf remove -y NetworkManager-config-connectivity-fedora
+systemctl restart NetworkManager
 
 # --- 10. Browser configuration ----------------------------------------------
 
@@ -186,15 +205,15 @@ log "Applying Brave policy configuration"
 BRAVE_POLICY_SCRIPT="$(mktemp /tmp/make_brave_great_again.XXXXXX.sh)"
 wget -O "${BRAVE_POLICY_SCRIPT}" \
     https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Browser/make_brave_great_again.sh
-sudo bash "${BRAVE_POLICY_SCRIPT}"
+bash "${BRAVE_POLICY_SCRIPT}"
 rm -f "${BRAVE_POLICY_SCRIPT}"
 
 log "Installing LibreWolf"
-sudo dnf config-manager addrepo --from-repofile=https://repo.librewolf.net/librewolf.repo
-sudo dnf install -y librewolf
+dnf config-manager addrepo --from-repofile=https://repo.librewolf.net/librewolf.repo
+dnf install -y librewolf
 
 log "Installing additional browsers (Chromium, Tor Browser Launcher)"
-sudo dnf install -y chromium torbrowser-launcher
+dnf install -y chromium torbrowser-launcher
 
 # --- 11. Gaming (optional) --------------------------------------------------
 
@@ -227,7 +246,7 @@ read -rp "Would you like to install the Zed editor? [y/N]: " zed_choice
 case "${zed_choice}" in
     [yY] | [yY][eE][sS])
         log "Installing the Zed editor"
-        curl -f https://zed.dev/install.sh | sh
+        run_as_user bash -c 'curl -f https://zed.dev/install.sh | sh'
         ;;
     *)
         log "Skipping Zed editor installation"
@@ -237,7 +256,7 @@ esac
 # --- 14. Cleanup and reboot -------------------------------------------------
 
 log "Removing orphaned packages"
-sudo dnf autoremove -y
+dnf autoremove -y
 
 log "Fedora post-setup complete."
 
@@ -245,7 +264,7 @@ read -rp "Would you like to reboot now? [y/N]: " reboot_choice
 case "${reboot_choice}" in
     [yY] | [yY][eE][sS])
         log "Rebooting..."
-        sudo systemctl reboot
+        systemctl reboot
         ;;
     *)
         log "Reboot skipped. Remember to reboot later to apply all changes."
