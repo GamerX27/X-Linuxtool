@@ -1,316 +1,238 @@
 #!/usr/bin/env bash
-# Fedora setup helper
-# Origin: XDora-inspired script, hardened & cleaned
+#
+# Fedora-PostSetup.sh
+# Post-installation setup helper for Fedora.
+#
+# Steps performed:
+#   1. Refresh metadata and apply all available updates.
+#   2. Enable the RPM Fusion (free + nonfree) repositories.
+#   3. Enable the Cisco OpenH264 repository for hardware/codec support.
+#   4. Update the @core package group.
+#   5. Install the full multimedia / codec stack.
+#   6. Install hardware-accelerated video codecs (Intel or AMD).
+#   7. Remove unwanted default apps and install base packages.
+#   8. Set up Flatpaks (Flathub remote, app list, Vivaldi).
+#   9. Disable the NetworkManager connectivity check.
+#  10. Install and configure the Brave browser.
+#  11. Optionally run the gaming setup script.
+#  12. Set LC_TIME locale to C.UTF-8.
+#  13. Clean up orphaned packages and optionally reboot.
+#
+# Usage: ./Fedora-PostSetup.sh
+#
 
-# Require sudo (do not auto-escalate)
-if [[ ${EUID:-$(id -u)} -ne 0 ]]; then
-  echo "This script must be run with sudo." >&2
-  exit 1
-fi
+set -euo pipefail
 
-if [[ -z "${SUDO_USER:-}" || "${SUDO_USER}" == "root" ]]; then
-  echo "Run this script via sudo from a non-root user to configure user-scoped settings." >&2
-  exit 1
-fi
+# --- Helpers ----------------------------------------------------------------
 
-echo "Running with elevated privileges for ${SUDO_USER}!"
-must "System upgrade and repo refresh" $SUDO dnf -y upgrade --refresh
-
-
-# -------------------------
-# Safety & helpers
-# -------------------------
-set -uo pipefail
-
-SCRIPT_NAME="$(basename "$0")"
-LOG_TS() { date +"%Y-%m-%d %H:%M:%S"; }
-info()  { echo "[INFO  $(LOG_TS)] $*"; }
-warn()  { echo "[WARN  $(LOG_TS)] $*" >&2; }
-error() { echo "[ERROR $(LOG_TS)] $*" >&2; }
-die()   { error "$*"; exit 1; }
-
-# If root, no sudo. If not root, need sudo.
-SUDO=""
-if [[ ${EUID:-$(id -u)} -ne 0 ]]; then
-  if command -v sudo >/dev/null 2>&1; then
-    SUDO="sudo"
-  else
-    die "This script needs root or 'sudo' installed."
-  fi
-fi
-
-TARGET_USER="${SUDO_USER}"
-TARGET_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
-[[ -n "$TARGET_HOME" ]] || die "Unable to determine home directory for ${TARGET_USER}."
-TARGET_GROUP="$(id -gn "$TARGET_USER" 2>/dev/null)"
-[[ -n "$TARGET_GROUP" ]] || die "Unable to determine primary group for ${TARGET_USER}."
-
-command_exists() { command -v "$1" >/dev/null 2>&1; }
-
-# try: run and continue on failure
-try() {
-  local desc="$1"; shift
-  info "$desc"
-  if "$@"; then
-    info "OK: $desc"
-    return 0
-  else
-    warn "FAILED (continuing): $desc"
-    return 1
-  fi
+log() {
+    printf '\n\033[1;34m==>\033[0m \033[1m%s\033[0m\n' "$1"
 }
 
-# must: run and abort on failure
-must() {
-  local desc="$1"; shift
-  info "$desc"
-  "$@" && { info "OK: $desc"; return 0; }
-  die "FAILED: $desc"
+err() {
+    printf '\n\033[1;31mError:\033[0m %s\n' "$1" >&2
 }
 
-# -------------------------
-# Pre-flight checks
-# -------------------------
-info "Starting ${SCRIPT_NAME}"
+require_cmd() {
+    if ! command -v "$1" >/dev/null 2>&1; then
+        err "Required command '$1' not found."
+        exit 1
+    fi
+}
 
-# Basic tools
-for bin in dnf rpm curl wget sed awk; do
-  command_exists "$bin" || die "Required tool missing: $bin"
-done
+set_locale_time() {
+    echo "Attempting to set LC_TIME to C.UTF-8..."
+    if sudo localectl set-locale LC_TIME=C.UTF-8; then
+        echo "Successfully set LC_TIME."
+    else
+        echo "Error: Failed to set the locale time. Check if you have permission or if the command is correct." >&2
+        return 1
+    fi
+}
 
-# Wallpaper credit: https://www.pixiv.net/en/artworks/82028519 by https://www.pixiv.net/en/users/15919563 (aka Tsuchiya)
-try "Download Tsuchiya wallpaper for ${TARGET_USER}" \
-  runuser -u "${TARGET_USER}" -- wget --directory-prefix="${TARGET_HOME}" "https://rare-gallery.com/uploads/posts/341250-Sunset-Starry-Night-Sky-Moon-Stars-Anime-Scenery.jpg"
+# --- Pre-flight checks ------------------------------------------------------
 
-# Fedora release number
-FEDORA_VER="$(rpm -E %fedora 2>/dev/null || echo "")"
-[[ -n "$FEDORA_VER" ]] || die "Unable to resolve %fedora macro."
-
-# -------------------------
-# System update & RPM Fusion
-# -------------------------
-must "Refreshing DNF metadata" $SUDO dnf -y makecache --refresh
-must "Updating system packages" $SUDO dnf -y update
-
-must "adding RPM Fussion nonfree and free to system" $SUDO dnf install -y \
-https://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm \
-https://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
-
-$SUDO dnf update --refresh
-
-
-try "Update @core group" $SUDO dnf -y update @core
-
-
-# -------------------------
-# Brave Browser (install script is not critical)
-# -------------------------
-if ! command_exists brave-browser; then
-  if curl -fsS https://dl.brave.com/install.sh >/dev/null 2>&1; then
-    try "Installing Brave via upstream script" bash -c 'curl -fsS https://dl.brave.com/install.sh | sh'
-  else
-    warn "Brave install script unreachable. Skipping Brave."
-  fi
-else
-  info "Brave already installed. Skipping."
+if [[ "${EUID}" -eq 0 ]]; then
+    err "Do not run this script as root. It will call sudo when needed."
+    exit 1
 fi
 
-# -------------------------
-# Multimedia stack & codecs
-# -------------------------
-try "Swap ffmpeg-free -> ffmpeg (may remove conflicting packages)" \
-  $SUDO dnf -y swap ffmpeg-free ffmpeg --allowerasing
+require_cmd sudo
+require_cmd dnf
+require_cmd rpm
 
-try "Install multimedia group (no weak deps, exclude PackageKit plugin)" \
-  $SUDO dnf -y update @multimedia --setopt=install_weak_deps=False --exclude=PackageKit-gstreamer-plugin
+# Detect the Fedora release version (e.g. 40, 41, ...).
+FEDORA_VERSION="$(rpm -E %fedora)"
+log "Detected Fedora ${FEDORA_VERSION}"
 
-# -------------------------
-# GPU/Media drivers (interactive, with default)
-# -------------------------
-echo "Select your option:"
-echo "  1) Intel"
-echo "  2) AMD GPUs"
-echo "  3) VM / Skip GPU driver setup"
-echo "  4) NVIDIA"
-read -rp "Enter 1, 2, 3, 4 [default: 3]: " choice
-choice="${choice:-3}"
+# Keep the sudo timestamp alive for the duration of the script.
+sudo -v
 
-case "$choice" in
-  1)
-    try "Installing libva-intel-media-driver" \
-      $SUDO dnf -y install libva-intel-media-driver
-    ;;
-  2)
-    try "Swap mesa-va-drivers -> mesa-va-drivers-freeworld" \
-      $SUDO dnf -y swap mesa-va-drivers mesa-va-drivers-freeworld
-    try "Swap mesa-vdpau-drivers -> mesa-vdpau-drivers-freeworld" \
-      $SUDO dnf -y swap mesa-vdpau-drivers mesa-vdpau-drivers-freeworld
-    try "Swap mesa-va-drivers.i686 -> mesa-va-drivers-freeworld.i686" \
-      $SUDO dnf -y swap mesa-va-drivers.i686 mesa-va-drivers-freeworld.i686
-    try "Swap mesa-vdpau-drivers.i686 -> mesa-vdpau-drivers-freeworld.i686" \
-      $SUDO dnf -y swap mesa-vdpau-drivers.i686 mesa-vdpau-drivers-freeworld.i686
-    ;;
-  3)
-    info "Skipping GPU/media driver installation."
-    ;;
-  4)
-    try "Installing NVIDIA VA-API driver" \
-      $SUDO dnf -y install libva-nvidia-driver
-    try "Installing NVIDIA VA-API multilib packages" \
-      $SUDO dnf -y install libva-nvidia-driver.{i686,x86_64}
-    ;;
-  *)
-    warn "Invalid choice '$choice'. Skipping GPU/media drivers."
-    ;;
+# --- 1. Refresh and upgrade -------------------------------------------------
+
+log "Refreshing metadata and upgrading the system"
+sudo dnf update --refresh -y
+sudo dnf upgrade -y
+
+# --- 2. Enable RPM Fusion (free + nonfree) ----------------------------------
+
+log "Enabling RPM Fusion (free + nonfree) repositories"
+sudo dnf install -y \
+    "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${FEDORA_VERSION}.noarch.rpm" \
+    "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FEDORA_VERSION}.noarch.rpm"
+
+# --- 3. Enable Cisco OpenH264 -----------------------------------------------
+
+log "Enabling the Cisco OpenH264 repository"
+sudo dnf config-manager setopt fedora-cisco-openh264.enabled=1
+
+# --- 4. Update @core --------------------------------------------------------
+
+log "Updating the @core package group"
+sudo dnf update -y @core
+
+# --- 5. Multimedia ----------------------------------------------------------
+
+log "Switching to the full ffmpeg build"
+sudo dnf swap ffmpeg-free ffmpeg --allowerasing -y
+
+log "Installing additional multimedia codecs"
+sudo dnf update -y @multimedia --setopt="install_weak_deps=False" --exclude=PackageKit-gstreamer-plugin
+
+# --- 6. Hardware-accelerated codecs -----------------------------------------
+
+log "Hardware-accelerated video codecs"
+echo "Select your GPU vendor for hardware-accelerated (VA-API) codecs:"
+echo "  1) Intel (recent - Broadwell/5th-gen and newer)"
+echo "  2) Intel (older - pre-Broadwell)"
+echo "  3) AMD"
+echo "  4) Skip"
+read -rp "Enter choice [1/2/3/4]: " gpu_choice
+
+case "${gpu_choice}" in
+    1)
+        log "Installing Intel (recent) hardware-accelerated codecs"
+        sudo dnf install -y intel-media-driver
+        ;;
+    2)
+        log "Installing Intel (older) hardware-accelerated codecs"
+        sudo dnf install -y libva-intel-driver
+        ;;
+    3)
+        log "Installing AMD hardware-accelerated codecs"
+        sudo dnf install -y mesa-va-drivers-freeworld
+        # 32-bit compat libraries (useful for Steam / Wine).
+        sudo dnf install -y mesa-va-drivers-freeworld.i686
+        ;;
+    *)
+        log "Skipping hardware-accelerated codec installation"
+        ;;
 esac
 
-# -------------------------
-# Flatpak & apps
-# -------------------------
-if command_exists flatpak; then
-  try "Add Flathub (if missing)" flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-else
-  warn "Flatpak is not installed. Skipping Flatpak steps."
-fi
+# --- 7. Base packages -------------------------------------------------------
 
-#Removes Fedora Flatpak repo
-sudo flatpak remote-delete fedora
+log "Removing unwanted default applications"
+sudo dnf remove -y dragon juk elisa-player kmail khelpcenter libreoffice*
 
+log "Installing base command-line tools"
+# Note: lspci ships in pciutils, sensors ships in lm_sensors.
+sudo dnf install -y wget fastfetch fish htop nano papirus-icon-theme curl pciutils lm_sensors
 
-# Remove unwanted packages (ignore if not installed)
-try "Removing selected packages (LibreOffice*, dragon, juk, elisa-player, kmail)" \
-  $SUDO dnf remove -y 'libreoffice*' dragon juk elisa-player kmail
+log "Installing base applications"
+sudo dnf install -y vlc nextcloud-client easyeffects gnome-disk-utility libreoffice-writer gwenview
 
-# Common tools
-try "Installing base tools (fish, papirus-icon-theme, vlc, fastfetch, qdbus)" \
-  $SUDO dnf -y install fish papirus-icon-theme vlc fastfetch qdbus
+# --- 8. Flatpaks ------------------------------------------------------------
 
-# Optional extras
-read -rp "Install all extras (Cryptomator, Bitwarden, LocalSend, Syncthing, Jellyfin Meida Player, Finamp)? (y/N): " answer
-answer="${answer,,}"
-if [[ "$answer" =~ ^(y|yes)$ ]]; then
-  if command_exists flatpak; then
-    try "Installing extras via Flatpak" \
-      flatpak install -y flathub \
-        org.cryptomator.Cryptomator \
-        com.bitwarden.desktop \
-        org.localsend.localsend_app \
-        com.github.zocker_160.SyncThingy \
-        com.github.iwalton3.jellyfin-media-player \
-        com.unicornsonlsd.finamp
-  else
-    warn "Flatpak not available; cannot install extras."
-  fi
-else
-  info "Skipping extras."
-fi
+log "Adding the Flathub remote"
+require_cmd flatpak
+flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
-# ------------------------------------------------------------
-# Nextcloud Apps for Syncing
-# ------------------------------------------------------------
+log "Running the Flatpak app install script"
+FLATPAKS_SCRIPT="$(mktemp /tmp/flatpaks.XXXXXX.sh)"
+wget -O "${FLATPAKS_SCRIPT}" \
+    https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Flatpak/flatpaks.sh
+bash "${FLATPAKS_SCRIPT}"
+rm -f "${FLATPAKS_SCRIPT}"
 
-# Install the Nextcloud desktop client (Fedora package)
-try "Installing Nextcloud desktop client" $SUDO dnf -y install nextcloud-client
+log "Disabling the Fedora Flatpak remotes"
+flatpak remote-modify fedora --disable
+flatpak remote-modify fedora-testing --disable
 
-# Install Iotas (Nextcloud-compatible notes app) via Flatpak
-flatpak install -y flathub org.gnome.World.Iotas
+log "Installing Vivaldi (Flatpak)"
+flatpak install -y flathub com.vivaldi.Vivaldi
 
-# ----------------------------------------------------------------------
-# === REMOVE GOOGLE CHROME COMPLETELY (Fedora) =========================
-# ----------------------------------------------------------------------
-remove_google_chrome() {
-    echo "=== Removing Google Chrome packages ==="
-    sudo dnf remove google-chrome-stable google-chrome-beta google-chrome-unstable -y
+# --- 9. Disable NetworkManager connectivity check ---------------------------
 
-    echo "=== Removing Google Chrome repository ==="
-    sudo dnf config-manager --set-disabled google-chrome 2>/dev/null || true
-    sudo rm -f /etc/yum.repos.d/google-chrome.repo
-
-    echo "=== Removing GPG key ==="
-    sudo rpm --erase $(rpm -qa | grep -i 'gpg-pubkey.*7fac5991' | tr '\n' ' ') 2>/dev/null || true
-
-    echo "=== Removing user configuration and cache ==="
-    rm -rf ~/.config/google-chrome ~/.cache/google-chrome
-    rm -f ~/.pki/nssdb/*chrome* 2>/dev/null || true
-
-    echo "=== Removing desktop entries and icons ==="
-    sudo rm -f /usr/share/applications/google-chrome*.desktop
-    sudo rm -rf /usr/share/icons/hicolor/*/*/google-chrome* 2>/dev/null || true
-
-    echo "=== Cleaning orphaned packages ==="
-    sudo dnf autoremove -y
-
-    echo "=== Verification ==="
-    if rpm -qa | grep -qi chrome; then
-        echo "Warning: Some Chrome-related RPMs still present!"
-    else
-        echo "No Chrome RPMs found."
-    fi
-    [ ! -f /etc/yum.repos.d/google-chrome.repo ] && echo "Repo file removed."
-    [ ! -d ~/.config/google-chrome ] && echo "User config removed."
-    echo "Google Chrome removal complete."
-}
-
-# Call the function (uncomment to run when script executes)
-# remove_google_chrome
-
-# -------------------------
-# NetworkManager connectivity check (safer override)
-# -------------------------
-# Prefer a drop-in in /etc over modifying vendor file in /usr/lib
-NM_DIR_ETC="/etc/NetworkManager/conf.d"
-NM_FILE_ETC="${NM_DIR_ETC}/20-connectivity-fedora.conf"
-
-info "Disabling NetworkManager connectivity check via /etc override..."
-try "Create NetworkManager conf.d directory" $SUDO mkdir -p "$NM_DIR_ETC"
-if [[ -e "$NM_FILE_ETC" ]]; then
-  try "Backing up existing ${NM_FILE_ETC}" \
-    $SUDO cp -n "$NM_FILE_ETC" "${NM_FILE_ETC}.bak"
-fi
-try "Writing override config" bash -c "cat <<'EOF' | $SUDO tee '$NM_FILE_ETC' >/dev/null
+log "Disabling the NetworkManager connectivity check"
+# An empty connectivity URI disables the check. We write the override to /etc
+# (the proper override location) so it persists across updates and survives the
+# removal of the vendor connectivity config package below.
+sudo mkdir -p /etc/NetworkManager/conf.d
+sudo tee /etc/NetworkManager/conf.d/20-connectivity-fedora.conf >/dev/null <<'EOF'
 [connectivity]
-enabled=false
-EOF"
+uri=
+EOF
 
-try "Reloading NetworkManager"  $SUDO systemctl reload NetworkManager
-try "Restarting NetworkManager" $SUDO systemctl restart NetworkManager
-info "Connectivity check disabled."
+sudo dnf remove -y NetworkManager-config-connectivity-fedora
+sudo systemctl restart NetworkManager
 
-# -------------------------
-# Brave enhancement script (best-effort)
-# -------------------------
-info "Starting Brave enhancement process (best-effort)..."
-TMP_SCRIPT="./make_brave_great_again.sh"
+# --- 10. Browser configuration ----------------------------------------------
 
-if curl -fsSL https://codeberg.org/X27/X-Linuxtools/raw/branch/main/Scripts/browser/Brave/make_brave_great_again.sh -o "$TMP_SCRIPT"; then
-  try "chmod +x $TMP_SCRIPT" chmod +x "$TMP_SCRIPT"
-  try "Run Brave enhancement script" "$TMP_SCRIPT"
-  try "Cleanup Brave enhancement script" rm -f "$TMP_SCRIPT"
-else
-  warn "Could not download Brave enhancement script. Skipping."
-fi
+log "Installing the Brave browser (origin flavor)"
+curl -fsS https://dl.brave.com/install.sh | FLAVOR=origin sh
 
-# -------------------------
-# Optional gaming setup
-# -------------------------
-read -rp "Would you like to install the optional gaming packages? [y/N]: " INSTALL_GAMING
-if [[ "$INSTALL_GAMING" =~ ^([Yy]|[Yy][Ee][Ss])$ ]]; then
-  GAMING_SCRIPT="$(mktemp /tmp/gaming-setup.XXXXXX.sh)" || die "Unable to create temp file for gaming script."
-  info "Downloading gaming setup script..."
-  if wget -q https://codeberg.org/X27/X-Linuxtools/raw/branch/main/Scripts/Gaming/Gaming.sh -O "$GAMING_SCRIPT"; then
-    try "Run gaming setup script" $SUDO bash "$GAMING_SCRIPT"
-  else
-    warn "Could not download gaming setup script. Skipping."
-  fi
-  info "Cleaning up gaming setup script."
-  rm -f "$GAMING_SCRIPT"
-else
-  info "Skipping gaming package installation."
-fi
+log "Applying Brave policy configuration"
+BRAVE_POLICY_SCRIPT="$(mktemp /tmp/make_brave_great_again.XXXXXX.sh)"
+wget -O "${BRAVE_POLICY_SCRIPT}" \
+    https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Browser/make_brave_great_again.sh
+sudo bash "${BRAVE_POLICY_SCRIPT}"
+rm -f "${BRAVE_POLICY_SCRIPT}"
 
-# -------------------------
-# Finish
-# -------------------------
-info "All done. Some steps may have been skipped if they failed."
-# Small pause for readability if run interactively
-sleep 2
+log "Installing LibreWolf"
+sudo dnf config-manager addrepo --from-repofile=https://repo.librewolf.net/librewolf.repo
+sudo dnf install -y librewolf
+
+log "Installing additional browsers (Chromium, Tor Browser Launcher)"
+sudo dnf install -y chromium torbrowser-launcher
+
+# --- 11. Gaming (optional) --------------------------------------------------
+
+log "Gaming setup"
+read -rp "Would you like to run the gaming setup script? [y/N]: " gaming_choice
+
+case "${gaming_choice}" in
+    [yY] | [yY][eE][sS])
+        log "Running the gaming setup script"
+        GAMING_SCRIPT="$(mktemp /tmp/Gaming.XXXXXX.sh)"
+        wget -O "${GAMING_SCRIPT}" \
+            https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Gaming/Gaming.sh
+        bash "${GAMING_SCRIPT}"
+        rm -f "${GAMING_SCRIPT}"
+        ;;
+    *)
+        log "Skipping gaming setup"
+        ;;
+esac
+
+# --- 12. Locale -------------------------------------------------------------
+
+log "Configuring LC_TIME locale"
+set_locale_time
+
+# --- 13. Cleanup and reboot -------------------------------------------------
+
+log "Removing orphaned packages"
+sudo dnf autoremove -y
+
+log "Fedora post-setup complete."
+
+read -rp "Would you like to reboot now? [y/N]: " reboot_choice
+case "${reboot_choice}" in
+    [yY] | [yY][eE][sS])
+        log "Rebooting..."
+        sudo systemctl reboot
+        ;;
+    *)
+        log "Reboot skipped. Remember to reboot later to apply all changes."
+        ;;
+esac
