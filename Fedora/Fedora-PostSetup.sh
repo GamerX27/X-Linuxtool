@@ -16,7 +16,8 @@
 #  10. Install and configure the Brave browser.
 #  11. Optionally run the gaming setup script.
 #  12. Set LC_TIME locale to C.UTF-8.
-#  13. Clean up orphaned packages and optionally reboot.
+#  13. Optionally install the Zed editor.
+#  14. Clean up orphaned packages and optionally reboot.
 #
 # Usage: ./Fedora-PostSetup.sh
 #
@@ -219,7 +220,21 @@ esac
 log "Configuring LC_TIME locale"
 set_locale_time
 
-# --- 13. Cleanup and reboot -------------------------------------------------
+# --- 13. Zed editor (optional) ----------------------------------------------
+
+log "Zed editor"
+read -rp "Would you like to install the Zed editor? [y/N]: " zed_choice
+case "${zed_choice}" in
+    [yY] | [yY][eE][sS])
+        log "Installing the Zed editor"
+        curl -f https://zed.dev/install.sh | sh
+        ;;
+    *)
+        log "Skipping Zed editor installation"
+        ;;
+esac
+
+# --- 14. Cleanup and reboot -------------------------------------------------
 
 log "Removing orphaned packages"
 sudo dnf autoremove -y
