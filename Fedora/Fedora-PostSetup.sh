@@ -133,7 +133,7 @@ esac
 # --- 7. Base packages -------------------------------------------------------
 
 log "Removing unwanted default applications"
-sudo dnf remove -y dragon juk elisa-player kmail khelpcenter libreoffice*
+sudo dnf remove -y dragon juk elisa-player kmail khelpcenter kmahjongg kmines kpat 'libreoffice*'
 
 log "Installing base command-line tools"
 # Note: lspci ships in pciutils, sensors ships in lm_sensors.
