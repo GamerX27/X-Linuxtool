@@ -176,8 +176,9 @@ bash "${FLATPAKS_SCRIPT}"
 rm -f "${FLATPAKS_SCRIPT}"
 
 log "Disabling the Fedora Flatpak remotes"
-flatpak remote-modify fedora --disable
-flatpak remote-modify fedora-testing --disable
+# These are system-level remotes installed by Fedora, so disabling them needs root.
+sudo flatpak remote-modify --system fedora --disable
+sudo flatpak remote-modify --system fedora-testing --disable
 
 log "Installing Vivaldi (Flatpak)"
 flatpak install -y flathub com.vivaldi.Vivaldi
