@@ -228,7 +228,7 @@ case "${gaming_choice}" in
         GAMING_SCRIPT="$(mktemp /tmp/Gaming.XXXXXX.sh)"
         wget -O "${GAMING_SCRIPT}" \
             https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Gaming/Gaming.sh
-        bash "${GAMING_SCRIPT}"
+        sudo bash "${GAMING_SCRIPT}"
         rm -f "${GAMING_SCRIPT}"
         ;;
     *)
