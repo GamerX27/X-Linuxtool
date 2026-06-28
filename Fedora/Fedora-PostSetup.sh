@@ -22,8 +22,9 @@
 # Usage: ./Fedora-PostSetup.sh
 #
 # Run this as your normal user (NOT with sudo). You will be asked for your
-# password once; system steps then use that cached sudo session, while
-# per-user steps (Flatpak, Zed) run as you without any further prompts.
+# password once; system steps (including the system-wide Flatpak installs) then
+# use that cached sudo session, while per-user steps (e.g. Zed) run as you
+# without any further prompts.
 #
 # The script is idempotent: it can be re-run safely without aborting on
 # already-installed packages or already-configured repositories.
@@ -50,6 +51,41 @@ require_cmd() {
         err "Required command '$1' not found."
         exit 1
     fi
+}
+
+# Repository locations: Codeberg is primary, GitHub is a fallback mirror.
+CODEBERG_RAW="https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main"
+GITHUB_RAW="https://raw.githubusercontent.com/GamerX27/X27-Linux-Desktop-Toolbox/main"
+
+_download() {
+    # _download <url> <output-file>
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "$1" -o "$2"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q -O "$2" "$1"
+    else
+        err "Neither curl nor wget is available."
+        return 1
+    fi
+}
+
+fetch_repo_file() {
+    # fetch_repo_file <relative/path> <output-file>
+    # Downloads from Codeberg (primary); falls back to the GitHub mirror.
+    local rel="$1" out="$2"
+
+    log "Fetching ${rel} from Codeberg"
+    if _download "${CODEBERG_RAW}/${rel}" "$out"; then
+        return 0
+    fi
+
+    warn "Codeberg unreachable; falling back to GitHub mirror."
+    if _download "${GITHUB_RAW}/${rel}" "$out"; then
+        return 0
+    fi
+
+    err "Could not fetch ${rel} from Codeberg or GitHub."
+    return 1
 }
 
 # Ask a yes/no question; returns 0 for yes, 1 for anything else (default no).
@@ -179,13 +215,16 @@ sudo dnf install -y vlc nextcloud-client easyeffects gnome-disk-utility libreoff
 require_cmd flatpak
 
 log "Adding the Flathub remote"
-flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+# Flatpaks are installed system-wide, so the remote must be configured
+# system-wide too. This needs root: the cached sudo session covers it without
+# triggering a polkit prompt (which would otherwise fail in a non-interactive
+# context with "ConfigureRemote not allowed for user").
+sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
 log "Running the Flatpak app install script"
 FLATPAKS_SCRIPT="$(mktemp /tmp/flatpaks.XXXXXX.sh)"
-wget -O "${FLATPAKS_SCRIPT}" \
-    https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Flatpak/flatpaks.sh
-bash "${FLATPAKS_SCRIPT}"
+fetch_repo_file "Flatpak/flatpaks.sh" "${FLATPAKS_SCRIPT}"
+sudo bash "${FLATPAKS_SCRIPT}"
 rm -f "${FLATPAKS_SCRIPT}"
 
 log "Disabling the Fedora Flatpak remotes"
@@ -193,7 +232,7 @@ sudo flatpak remote-modify fedora --disable
 sudo flatpak remote-modify fedora-testing --disable
 
 log "Installing Vivaldi (Flatpak)"
-flatpak install -y flathub com.vivaldi.Vivaldi
+sudo flatpak install -y flathub com.vivaldi.Vivaldi
 
 # --- 9. Disable NetworkManager connectivity check ---------------------------
 
@@ -217,8 +256,7 @@ curl -fsS https://dl.brave.com/install.sh | FLAVOR=origin sh
 
 log "Applying Brave policy configuration"
 BRAVE_POLICY_SCRIPT="$(mktemp /tmp/make_brave_great_again.XXXXXX.sh)"
-wget -O "${BRAVE_POLICY_SCRIPT}" \
-    https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Browser/make_brave_great_again.sh
+fetch_repo_file "Browser/make_brave_great_again.sh" "${BRAVE_POLICY_SCRIPT}"
 sudo bash "${BRAVE_POLICY_SCRIPT}"
 rm -f "${BRAVE_POLICY_SCRIPT}"
 
@@ -236,8 +274,7 @@ log "Gaming setup"
 if ask_yes_no "Would you like to run the gaming setup script?"; then
     log "Running the gaming setup script"
     GAMING_SCRIPT="$(mktemp /tmp/Gaming.XXXXXX.sh)"
-    wget -O "${GAMING_SCRIPT}" \
-        https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Gaming/Gaming.sh
+    fetch_repo_file "Gaming/Gaming.sh" "${GAMING_SCRIPT}"
     sudo bash "${GAMING_SCRIPT}"
     rm -f "${GAMING_SCRIPT}"
 else
