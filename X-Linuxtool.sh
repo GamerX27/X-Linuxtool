@@ -1,5 +1,48 @@
 #!/bin/bash
 
+# --- Repository locations ---------------------------------------------------
+# Codeberg is the primary source; GitHub is a mirror used as a fallback when
+# Codeberg cannot be reached.
+CB_TOOLBOX="https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main"
+GH_TOOLBOX="https://raw.githubusercontent.com/GamerX27/X27-Linux-Desktop-Toolbox/main"
+
+CB_HOMELAB="https://codeberg.org/X27/X27-Homelab-ToolBox/raw/branch/main"
+GH_HOMELAB="https://raw.githubusercontent.com/GamerX27/X27-Homelab-ToolBox/main"
+
+CB_YTDLP="https://codeberg.org/X27/YTDLP-Easy-Script/raw/branch/main"
+GH_YTDLP="https://raw.githubusercontent.com/GamerX27/YTDLP-Easy-Script/main"
+
+_download() {
+    # _download <url> <output-file>
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "$1" -o "$2"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q -O "$2" "$1"
+    else
+        echo "ERROR: Neither curl nor wget is available." >&2
+        return 1
+    fi
+}
+
+fetch_file() {
+    # fetch_file <codeberg-url> <github-url> <output-file>
+    # Downloads from Codeberg (primary); falls back to the GitHub mirror.
+    local cb="$1" gh="$2" out="$3"
+
+    echo "Fetching from Codeberg..." >&2
+    if _download "$cb" "$out"; then
+        return 0
+    fi
+
+    echo "Codeberg unreachable; falling back to GitHub mirror..." >&2
+    if _download "$gh" "$out"; then
+        return 0
+    fi
+
+    echo "ERROR: Could not download from Codeberg or GitHub." >&2
+    return 1
+}
+
 check_and_install_dependencies() {
     local dependencies=("wget" "git" "curl")
     local pkg_manager=""
@@ -57,57 +100,57 @@ read -p "Enter your choice (1, 2, 3, 4, 5, 6, 7, 8, or 9): " choice
 case $choice in
     1)
         echo "Downloading and running Fedora Desktop..."
-        wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Fedora.sh
-        sudo bash Fedora.sh
-        sudo rm Fedora.sh
+        fetch_file "${CB_TOOLBOX}/Fedora.sh" "${GH_TOOLBOX}/Fedora.sh" /tmp/Fedora.sh || exit 1
+        sudo bash /tmp/Fedora.sh
+        sudo rm -f /tmp/Fedora.sh
         ;;
     2)
         echo "Downloading and running for HomeLab..."
-        wget https://codeberg.org/X27/X27-Homelab-ToolBox/raw/branch/main/X27-Homelab.sh
-        sudo bash X27-Homelab.sh
-        sudo rm X27-Homelab.sh
+        fetch_file "${CB_HOMELAB}/X27-Homelab.sh" "${GH_HOMELAB}/X27-Homelab.sh" /tmp/X27-Homelab.sh || exit 1
+        sudo bash /tmp/X27-Homelab.sh
+        sudo rm -f /tmp/X27-Homelab.sh
         ;;
     3)
         echo "Downloading and running Brave Debloat..."
-        wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Browser/make_brave_great_again.sh
-        sudo bash make_brave_great_again.sh
-        sudo rm make_brave_great_again.sh
+        fetch_file "${CB_TOOLBOX}/Browser/make_brave_great_again.sh" "${GH_TOOLBOX}/Browser/make_brave_great_again.sh" /tmp/make_brave_great_again.sh || exit 1
+        sudo bash /tmp/make_brave_great_again.sh
+        sudo rm -f /tmp/make_brave_great_again.sh
         ;;
     4)
         echo "Downloading and running YT-DLP-Easy Installer..."
-        wget https://codeberg.org/X27/YTDLP-Easy-Script/raw/branch/main/Install-YT-DLP-Easy.sh
-        bash Install-YT-DLP-Easy.sh
-        sudo rm Install-YT-DLP-Easy.sh
+        fetch_file "${CB_YTDLP}/Install-YT-DLP-Easy.sh" "${GH_YTDLP}/Install-YT-DLP-Easy.sh" /tmp/Install-YT-DLP-Easy.sh || exit 1
+        bash /tmp/Install-YT-DLP-Easy.sh
+        sudo rm -f /tmp/Install-YT-DLP-Easy.sh
         ;;
     5)
         echo "Downloading and running Kron4ek Wine Installer..."
-        wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Gaming/Kron4ek-wine-installer.sh
-        bash Kron4ek-wine-installer.sh
-        rm Kron4ek-wine-installer.sh
+        fetch_file "${CB_TOOLBOX}/Gaming/Kron4ek-wine-installer.sh" "${GH_TOOLBOX}/Gaming/Kron4ek-wine-installer.sh" /tmp/Kron4ek-wine-installer.sh || exit 1
+        bash /tmp/Kron4ek-wine-installer.sh
+        rm -f /tmp/Kron4ek-wine-installer.sh
         ;;
     6)
         echo "Downloading and running Proton CachyOS Installer..."
-        wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Gaming/proton-cachyos-installer.sh
-        bash proton-cachyos-installer.sh
-        rm proton-cachyos-installer.sh
+        fetch_file "${CB_TOOLBOX}/Gaming/proton-cachyos-installer.sh" "${GH_TOOLBOX}/Gaming/proton-cachyos-installer.sh" /tmp/proton-cachyos-installer.sh || exit 1
+        bash /tmp/proton-cachyos-installer.sh
+        rm -f /tmp/proton-cachyos-installer.sh
         ;;
     7)
         echo "Downloading and running Gigabyte Sleep Fix..."
-        wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Tools/GigabyteSleep-Fix.sh
-        sudo bash GigabyteSleep-Fix.sh
-        sudo rm GigabyteSleep-Fix.sh
+        fetch_file "${CB_TOOLBOX}/Tools/GigabyteSleep-Fix.sh" "${GH_TOOLBOX}/Tools/GigabyteSleep-Fix.sh" /tmp/GigabyteSleep-Fix.sh || exit 1
+        sudo bash /tmp/GigabyteSleep-Fix.sh
+        sudo rm -f /tmp/GigabyteSleep-Fix.sh
         ;;
     8)
         echo "Downloading and running Fastfetch Config Update..."
-        wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Tools/fsfetch.sh
-        bash fsfetch.sh
-        rm fsfetch.sh
+        fetch_file "${CB_TOOLBOX}/Tools/fsfetch.sh" "${GH_TOOLBOX}/Tools/fsfetch.sh" /tmp/fsfetch.sh || exit 1
+        bash /tmp/fsfetch.sh
+        rm -f /tmp/fsfetch.sh
         ;;
     9)
         echo "Downloading and running Virtualization Setup..."
-        wget https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Tools/Virtualization_Setup.sh
-        sudo bash Virtualization_Setup.sh
-        sudo rm Virtualization_Setup.sh
+        fetch_file "${CB_TOOLBOX}/Tools/Virtualization_Setup.sh" "${GH_TOOLBOX}/Tools/Virtualization_Setup.sh" /tmp/Virtualization_Setup.sh || exit 1
+        sudo bash /tmp/Virtualization_Setup.sh
+        sudo rm -f /tmp/Virtualization_Setup.sh
         ;;
     *)
         echo "Invalid choice. Exiting."
