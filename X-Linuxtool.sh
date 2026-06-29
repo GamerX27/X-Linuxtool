@@ -189,9 +189,12 @@ read -r choice < "$INPUT"
 case $choice in
     1)
         ui_step "Fedora Desktop"
+        # Run as the normal user (NOT with sudo): Fedora.sh and its sub-scripts
+        # (e.g. Fedora-PostSetup.sh) request sudo themselves and include
+        # per-user steps that must not run as root.
         fetch_file "${CB_TOOLBOX}/Fedora.sh" "${GH_TOOLBOX}/Fedora.sh" /tmp/Fedora.sh || exit 1
-        sudo bash /tmp/Fedora.sh < "$INPUT"
-        sudo rm -f /tmp/Fedora.sh
+        bash /tmp/Fedora.sh < "$INPUT"
+        rm -f /tmp/Fedora.sh
         ;;
     2)
         ui_step "HomeLab"
