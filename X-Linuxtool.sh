@@ -1,5 +1,17 @@
 #!/bin/bash
 
+# --- Piped execution support ------------------------------------------------
+# This script is designed to be run directly from the web, e.g.:
+#   curl -fsSL https://raw.githubusercontent.com/GamerX27/X-Linuxtool/refs/heads/main/X-Linuxtool.sh | bash
+#   curl -fsSL https://codeberg.org/X27/X-Linuxtool/raw/branch/main/X-Linuxtool.sh | bash
+#
+# When piped into bash, stdin is the script stream rather than the keyboard,
+# which would break the interactive menu and any sub-scripts that prompt for
+# input. Reconnect stdin to the controlling terminal so prompts work normally.
+if [ ! -t 0 ] && [ -r /dev/tty ]; then
+    exec < /dev/tty
+fi
+
 # --- Repository locations ---------------------------------------------------
 # Codeberg is the primary source; GitHub is a mirror used as a fallback when
 # Codeberg cannot be reached.
