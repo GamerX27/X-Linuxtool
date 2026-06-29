@@ -200,7 +200,7 @@ esac
 # --- 7. Base packages -------------------------------------------------------
 
 log "Removing unwanted default applications"
-sudo dnf remove -y --skip-unavailable \
+sudo dnf remove -y \
     dragon juk elisa-player kmail khelpcenter kmahjongg kmines kpat firefox 'libreoffice*'
 
 log "Installing base command-line tools"
