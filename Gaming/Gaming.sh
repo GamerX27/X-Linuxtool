@@ -57,6 +57,64 @@ install_utilities() {
   fi
 }
 
+########## Extra installers (Wine TkG + Proton CachyOS) ##########
+# These scripts live in the repo's Gaming/ folder. Codeberg is primary, GitHub is fallback.
+CODEBERG_RAW_BASE="https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Gaming"
+GITHUB_RAW_BASE="https://raw.githubusercontent.com/GamerX27/X27-Linux-Desktop-Toolbox/main/Gaming"
+
+ensure_curl() {
+  have_cmd curl && return 0
+  echo "[*] Installing curl (needed for extra installers)…"
+  if have_cmd dnf; then
+    dnf install -y curl
+  elif have_cmd apt; then
+    apt update
+    apt install -y curl
+  elif have_cmd pacman; then
+    pacman -S --noconfirm curl
+  else
+    echo "[-] Could not install curl on this system."
+    return 1
+  fi
+}
+
+fetch_script() {
+  # fetch_script <script-name> <dest>; tries Codeberg first, then GitHub.
+  local name="$1" dest="$2"
+  echo "[*] Fetching ${name} from Codeberg…"
+  if curl -fsSL "${CODEBERG_RAW_BASE}/${name}" -o "$dest"; then
+    return 0
+  fi
+  echo "[!] Codeberg fetch failed; trying GitHub…"
+  if curl -fsSL "${GITHUB_RAW_BASE}/${name}" -o "$dest"; then
+    return 0
+  fi
+  echo "[-] Failed to fetch ${name} from both Codeberg and GitHub."
+  return 1
+}
+
+run_extra_installers() {
+  ensure_curl || { echo "[-] Skipping extra installers (curl unavailable)."; return 0; }
+
+  local USERNAME tmpdir
+  USERNAME="${SUDO_USER:-$(logname 2>/dev/null || echo root)}"
+  tmpdir="$(mktemp -d)"
+  trap 'rm -rf "$tmpdir"' RETURN
+  # Allow the target (non-root) user to read the downloaded scripts.
+  chmod 755 "$tmpdir"
+
+  local scripts=("Kron4ek-wine-installer.sh" "proton-cachyos-installer.sh")
+  local s
+  for s in "${scripts[@]}"; do
+    if fetch_script "$s" "$tmpdir/$s"; then
+      chmod 755 "$tmpdir/$s"
+      echo "[*] Running ${s} as ${USERNAME}…"
+      # These installers must NOT run as root, so drop privileges.
+      sudo -u "$USERNAME" -H bash "$tmpdir/$s" || echo "[-] ${s} exited with errors."
+    fi
+  done
+}
+
 ########## Debian / Ubuntu family ##########
 install_debian_like() {
   echo "[*] Debian/Ubuntu family detected."
@@ -213,6 +271,10 @@ main() {
     echo "Targets: Debian-based, Fedora-based, and Arch-based."
     exit 2
   fi
+
+  echo
+  echo "[*] Running extra installers (Wine Staging TkG + Proton CachyOS)…"
+  run_extra_installers
 
   echo
   echo "[✓] Done. Reboot recommended."
