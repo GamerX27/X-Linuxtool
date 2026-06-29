@@ -5,11 +5,15 @@
 #   curl -fsSL https://raw.githubusercontent.com/GamerX27/X-Linuxtool/refs/heads/main/X-Linuxtool.sh | bash
 #   curl -fsSL https://codeberg.org/X27/X-Linuxtool/raw/branch/main/X-Linuxtool.sh | bash
 #
-# When piped into bash, stdin is the script stream rather than the keyboard,
-# which would break the interactive menu and any sub-scripts that prompt for
-# input. Reconnect stdin to the controlling terminal so prompts work normally.
-if [ ! -t 0 ] && [ -r /dev/tty ]; then
-    exec < /dev/tty
+# When piped into bash, bash reads THIS script from stdin (the pipe), so we
+# must not redirect the whole script's stdin away from it. Instead, point
+# interactive commands (the menu and any sub-scripts) at the controlling
+# terminal individually via $INPUT. When a terminal isn't available we fall
+# back to the normal stdin.
+if [ -r /dev/tty ]; then
+    INPUT=/dev/tty
+else
+    INPUT=/dev/stdin
 fi
 
 # --- Repository locations ---------------------------------------------------
@@ -107,61 +111,61 @@ echo "6) Proton CachyOS Installer"
 echo "7) Gigabyte Sleep Fix"
 echo "8) Custom Fastfetch Config"
 echo "9) Virtualization Setup"
-read -p "Enter your choice (1, 2, 3, 4, 5, 6, 7, 8, or 9): " choice
+read -p "Enter your choice (1, 2, 3, 4, 5, 6, 7, 8, or 9): " choice < "$INPUT"
 
 case $choice in
     1)
         echo "Downloading and running Fedora Desktop..."
         fetch_file "${CB_TOOLBOX}/Fedora.sh" "${GH_TOOLBOX}/Fedora.sh" /tmp/Fedora.sh || exit 1
-        sudo bash /tmp/Fedora.sh
+        sudo bash /tmp/Fedora.sh < "$INPUT"
         sudo rm -f /tmp/Fedora.sh
         ;;
     2)
         echo "Downloading and running for HomeLab..."
         fetch_file "${CB_HOMELAB}/X27-Homelab.sh" "${GH_HOMELAB}/X27-Homelab.sh" /tmp/X27-Homelab.sh || exit 1
-        sudo bash /tmp/X27-Homelab.sh
+        sudo bash /tmp/X27-Homelab.sh < "$INPUT"
         sudo rm -f /tmp/X27-Homelab.sh
         ;;
     3)
         echo "Downloading and running Brave Debloat..."
         fetch_file "${CB_TOOLBOX}/Browser/make_brave_great_again.sh" "${GH_TOOLBOX}/Browser/make_brave_great_again.sh" /tmp/make_brave_great_again.sh || exit 1
-        sudo bash /tmp/make_brave_great_again.sh
+        sudo bash /tmp/make_brave_great_again.sh < "$INPUT"
         sudo rm -f /tmp/make_brave_great_again.sh
         ;;
     4)
         echo "Downloading and running YT-DLP-Easy Installer..."
         fetch_file "${CB_YTDLP}/Install-YT-DLP-Easy.sh" "${GH_YTDLP}/Install-YT-DLP-Easy.sh" /tmp/Install-YT-DLP-Easy.sh || exit 1
-        bash /tmp/Install-YT-DLP-Easy.sh
+        bash /tmp/Install-YT-DLP-Easy.sh < "$INPUT"
         sudo rm -f /tmp/Install-YT-DLP-Easy.sh
         ;;
     5)
         echo "Downloading and running Kron4ek Wine Installer..."
         fetch_file "${CB_TOOLBOX}/Gaming/Kron4ek-wine-installer.sh" "${GH_TOOLBOX}/Gaming/Kron4ek-wine-installer.sh" /tmp/Kron4ek-wine-installer.sh || exit 1
-        bash /tmp/Kron4ek-wine-installer.sh
+        bash /tmp/Kron4ek-wine-installer.sh < "$INPUT"
         rm -f /tmp/Kron4ek-wine-installer.sh
         ;;
     6)
         echo "Downloading and running Proton CachyOS Installer..."
         fetch_file "${CB_TOOLBOX}/Gaming/proton-cachyos-installer.sh" "${GH_TOOLBOX}/Gaming/proton-cachyos-installer.sh" /tmp/proton-cachyos-installer.sh || exit 1
-        bash /tmp/proton-cachyos-installer.sh
+        bash /tmp/proton-cachyos-installer.sh < "$INPUT"
         rm -f /tmp/proton-cachyos-installer.sh
         ;;
     7)
         echo "Downloading and running Gigabyte Sleep Fix..."
         fetch_file "${CB_TOOLBOX}/Tools/GigabyteSleep-Fix.sh" "${GH_TOOLBOX}/Tools/GigabyteSleep-Fix.sh" /tmp/GigabyteSleep-Fix.sh || exit 1
-        sudo bash /tmp/GigabyteSleep-Fix.sh
+        sudo bash /tmp/GigabyteSleep-Fix.sh < "$INPUT"
         sudo rm -f /tmp/GigabyteSleep-Fix.sh
         ;;
     8)
         echo "Downloading and running Fastfetch Config Update..."
         fetch_file "${CB_TOOLBOX}/Tools/fsfetch.sh" "${GH_TOOLBOX}/Tools/fsfetch.sh" /tmp/fsfetch.sh || exit 1
-        bash /tmp/fsfetch.sh
+        bash /tmp/fsfetch.sh < "$INPUT"
         rm -f /tmp/fsfetch.sh
         ;;
     9)
         echo "Downloading and running Virtualization Setup..."
         fetch_file "${CB_TOOLBOX}/Tools/Virtualization_Setup.sh" "${GH_TOOLBOX}/Tools/Virtualization_Setup.sh" /tmp/Virtualization_Setup.sh || exit 1
-        sudo bash /tmp/Virtualization_Setup.sh
+        sudo bash /tmp/Virtualization_Setup.sh < "$INPUT"
         sudo rm -f /tmp/Virtualization_Setup.sh
         ;;
     *)
