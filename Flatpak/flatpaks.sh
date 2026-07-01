@@ -7,4 +7,5 @@ flatpak install -y flathub \
         org.jellyfin.JellyfinDesktop \
         com.unicornsonlsd.finamp \
         org.gnome.World.Iotas \
-        io.github.mfat.sshpilot
+        io.github.mfat.sshpilot \
+        org.pvermeer.WebAppHub
