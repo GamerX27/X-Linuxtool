@@ -201,7 +201,8 @@ esac
 
 log "Removing unwanted default applications"
 sudo dnf remove -y \
-    dragon juk elisa-player kmail khelpcenter kmahjongg kmines kpat firefox 'libreoffice*'
+    dragon juk elisa-player kmail khelpcenter kmahjongg kmines kpat firefox \
+    kaddressbook korganizer kolourpaint kamoso neochat 'libreoffice*'
 
 log "Installing base command-line tools"
 # Note: lspci ships in pciutils, sensors ships in lm_sensors.
