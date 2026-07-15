@@ -172,30 +172,56 @@ sudo dnf update -y @multimedia --setopt="install_weak_deps=False" --exclude=Pack
 # --- 6. Hardware-accelerated codecs -----------------------------------------
 
 log "Hardware-accelerated video codecs"
-echo "Select your GPU vendor for hardware-accelerated (VA-API) codecs:"
-echo "  1) Intel (recent - Broadwell/5th-gen and newer)"
-echo "  2) Intel (older - pre-Broadwell)"
-echo "  3) AMD"
-echo "  4) Skip"
-read -rp "Enter choice [1/2/3/4]: " gpu_choice
 
-case "${gpu_choice}" in
-    1)
-        log "Installing Intel (recent) hardware-accelerated codecs"
-        sudo dnf install -y intel-media-driver
-        ;;
-    2)
-        log "Installing Intel (older) hardware-accelerated codecs"
-        sudo dnf install -y libva-intel-driver
-        ;;
-    3)
-        log "Installing AMD hardware-accelerated codecs"
-        sudo dnf install -y mesa-va-drivers-freeworld mesa-va-drivers-freeworld.i686
-        ;;
-    *)
-        log "Skipping hardware-accelerated codec installation"
-        ;;
-esac
+require_cmd systemd-detect-virt
+
+# lspci (pciutils) is needed for GPU detection; install it early if missing.
+if ! command -v lspci >/dev/null 2>&1; then
+    sudo dnf install -y pciutils
+fi
+
+# Regex of Intel GPU codenames/descriptions that predate Broadwell (5th gen).
+# These need the legacy libva-intel-driver instead of intel-media-driver.
+INTEL_OLD_GEN_RE='Sandy Bridge|Ivy Bridge|Haswell|Bay Trail|Atom Processor|2nd Generation Core|3rd Gen Core|4th Gen Core|Core Processor Integrated Graphics|Cedarview|Cedar Trail|Poulsbo|Arrandale|Clarkdale|Ironlake|Pineview|Eaglelake|Broadwater|GMA'
+
+VIRT_TYPE="$(systemd-detect-virt 2>/dev/null || echo none)"
+
+if [[ "${VIRT_TYPE}" != "none" ]]; then
+    log "Virtual machine detected (${VIRT_TYPE}); skipping hardware-accelerated codec installation"
+else
+    mapfile -t GPU_LINES < <(lspci 2>/dev/null | grep -iE 'vga compatible controller|3d controller|display controller')
+
+    if [[ ${#GPU_LINES[@]} -eq 0 ]]; then
+        log "No GPU detected; skipping hardware-accelerated codec installation"
+    else
+        log "Detected GPU(s):"
+        printf '  %s\n' "${GPU_LINES[@]}"
+
+        installed_any=0
+
+        INTEL_LINE="$(printf '%s\n' "${GPU_LINES[@]}" | grep -i 'Intel Corporation' || true)"
+        if [[ -n "${INTEL_LINE}" ]]; then
+            if grep -iE "${INTEL_OLD_GEN_RE}" <<<"${INTEL_LINE}" >/dev/null; then
+                log "Installing Intel (older, pre-Broadwell) hardware-accelerated codecs"
+                sudo dnf install -y libva-intel-driver
+            else
+                log "Installing Intel (Broadwell/5th-gen and newer) hardware-accelerated codecs"
+                sudo dnf install -y intel-media-driver
+            fi
+            installed_any=1
+        fi
+
+        if printf '%s\n' "${GPU_LINES[@]}" | grep -iE 'Advanced Micro Devices|AMD/ATI|\[ATI\]' >/dev/null; then
+            log "Installing AMD hardware-accelerated codecs"
+            sudo dnf install -y mesa-va-drivers-freeworld mesa-va-drivers-freeworld.i686
+            installed_any=1
+        fi
+
+        if [[ "${installed_any}" -eq 0 ]]; then
+            log "No supported GPU vendor detected for VA-API codecs; skipping"
+        fi
+    fi
+fi
 
 # --- 7. Base packages -------------------------------------------------------
 
