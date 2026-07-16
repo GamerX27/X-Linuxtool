@@ -250,6 +250,9 @@ EOF
 sudo dnf remove -y --skip-unavailable NetworkManager-config-connectivity-fedora
 sudo systemctl restart NetworkManager
 
+log "Waiting 10 seconds for NetworkManager to settle"
+sleep 10
+
 # --- 10. Browser configuration ----------------------------------------------
 
 log "Installing the Brave browser (origin flavor)"
