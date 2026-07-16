@@ -247,7 +247,7 @@ sudo tee /etc/NetworkManager/conf.d/20-connectivity-fedora.conf >/dev/null <<'EO
 uri=
 EOF
 
-sudo dnf remove -y --skip-unavailable NetworkManager-config-connectivity-fedora
+sudo dnf remove -y NetworkManager-config-connectivity-fedora
 sudo systemctl restart NetworkManager
 
 log "Waiting 10 seconds for NetworkManager to settle"
