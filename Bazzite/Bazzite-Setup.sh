@@ -42,7 +42,7 @@ fetch_repo_file() {
 echo "Configuring NetworkManager privacy settings..."
 mkdir -p /etc/NetworkManager/conf.d
 [[ -e /etc/NetworkManager/conf.d/20-connectivity-fedora.conf ]] && cp -n /etc/NetworkManager/conf.d/20-connectivity-fedora.conf /etc/NetworkManager/conf.d/20-connectivity-fedora.conf.bak
-printf "[connectivity]\nenabled=false\n" | tee /etc/Network/Manager/conf.d/20-connectivity-fedora.conf >/dev/null
+printf "[connectivity]\nenabled=false\n" | tee /etc/NetworkManager/conf.d/20-connectivity-fedora.conf >/dev/null
 systemctl restart NetworkManager
 
 echo "Replacing Firefox with Brave Browser..."
