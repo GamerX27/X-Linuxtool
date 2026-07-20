@@ -39,10 +39,14 @@ fetch_repo_file() {
 }
 
 
-echo "Configuring NetworkManager privacy settings..."
-mkdir -p /etc/NetworkManager/conf.d
-[[ -e /etc/NetworkManager/conf.d/20-connectivity-fedora.conf ]] && cp -n /etc/NetworkManager/conf.d/20-connectivity-fedora.conf /etc/NetworkManager/conf.d/20-connectivity-fedora.conf.bak
-printf "[connectivity]\nenabled=false\n" | tee /etc/NetworkManager/conf.d/20-connectivity-fedora.conf >/dev/null
+echo "Disabling NetworkManager connectivity check..."
+NM_DIR_ETC="/etc/NetworkManager/conf.d"
+NM_FILE_ETC="${NM_DIR_ETC}/20-connectivity-fedora.conf"
+mkdir -p "$NM_DIR_ETC"
+if [[ -e "$NM_FILE_ETC" ]]; then
+    cp -n "$NM_FILE_ETC" "${NM_FILE_ETC}.bak" || echo "WARN: Failed to back up NetworkManager config."
+fi
+printf '[connectivity]\nenabled=false\n' > "$NM_FILE_ETC"
 systemctl restart NetworkManager
 
 echo "Replacing Firefox with Brave Browser..."
