@@ -21,6 +21,7 @@ sudo mkdir -p /etc/brave/policies/managed
 
 sudo tee /etc/brave/policies/managed/make_brave_great_again.json >/dev/null <<'JSON'
 {
+  "RestoreOnStartup": 5,
   "BraveAIChatEnabled": false,
   "BraveWalletDisabled": true,
   "TorDisabled": true,
