@@ -8,4 +8,5 @@ flatpak install -y flathub \
         com.unicornsonlsd.finamp \
         org.gnome.World.Iotas \
         io.github.mfat.sshpilot \
-        org.pvermeer.WebAppHub
+        org.pvermeer.WebAppHub \
+        io.missioncenter.MissionCenter
