@@ -56,15 +56,15 @@ case $choice in
         echo "Downloading and running Fedora-Kionite-Setup.sh..."
         fetch_repo_file "Fedora/Fedora-Kionite-Setup.sh" /tmp/Fedora-Kionite-Setup.sh
         chmod +x /tmp/Fedora-Kionite-Setup.sh
-        /tmp/Fedora-Kionite-Setup.sh
-        rm -f /tmp/Fedora-Kionite-Setup.sh
+        sudo /tmp/Fedora-Kionite-Setup.sh
+        sudo rm -f /tmp/Fedora-Kionite-Setup.sh
         ;;
     3)
         echo "Downloading and running Bazzite-Setup.sh..."
         fetch_repo_file "Bazzite/Bazzite-Setup.sh" /tmp/Bazzite-Setup.sh
         chmod +x /tmp/Bazzite-Setup.sh
-        /tmp/Bazzite-Setup.sh
-        rm -f /tmp/Bazzite-Setup.sh
+        sudo /tmp/Bazzite-Setup.sh
+        sudo rm -f /tmp/Bazzite-Setup.sh
         ;;
     *)
         echo "Invalid choice. Exiting."
