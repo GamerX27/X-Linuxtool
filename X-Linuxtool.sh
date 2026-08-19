@@ -17,23 +17,57 @@ else
 fi
 
 # --- Theme / colors ---------------------------------------------------------
-# Only enable colors when writing to a terminal that supports them, so piped
-# or redirected output stays clean.
+# Nord palette (https://www.nordtheme.com), anchored on the two colors
+# requested for this tool: Polar Night #2e3440 (base/border) and Aurora Red
+# #bf616a (accent/selection). True-color (24-bit) escapes are used on
+# terminals likely to support them; the Linux virtual console and bare
+# screen/tmux terms fall back to the nearest 256-color approximations.
+# Colors are only enabled when writing to a terminal, so piped/redirected
+# output stays clean.
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
     C_BOLD=$'\033[1m'
     C_DIM=$'\033[2m'
-    C_RED=$'\033[38;5;203m'
-    C_GREEN=$'\033[38;5;114m'
-    C_YELLOW=$'\033[38;5;221m'
-    C_BLUE=$'\033[38;5;75m'
-    C_MAGENTA=$'\033[38;5;176m'
-    C_CYAN=$'\033[38;5;80m'
-    C_GREY=$'\033[38;5;245m'
-    C_ACCENT=$'\033[38;5;147m'
+    C_REV=$'\033[7m'
+
+    case "${TERM:-}" in
+        linux|screen|screen-*|tmux-*)
+            # Nearest 256-color approximations of the Nord palette.
+            C_BASE=$'\033[38;5;236m'    # nord0  2e3440
+            C_SURFACE=$'\033[38;5;237m' # nord1  3b4252
+            C_GREY=$'\033[38;5;244m'    # nord3  4c566a
+            C_FG=$'\033[38;5;253m'      # nord4  d8dee9
+            C_CYAN=$'\033[38;5;116m'    # nord8  88c0d0
+            C_BLUE=$'\033[38;5;110m'    # nord9  81a1c1
+            C_RED=$'\033[38;5;167m'     # nord11 bf616a
+            C_YELLOW=$'\033[38;5;222m'  # nord13 ebcb8b
+            C_GREEN=$'\033[38;5;150m'   # nord14 a3be8c
+            C_MAGENTA=$'\033[38;5;139m' # nord15 b48ead
+            C_ACCENT=$'\033[38;5;167m'  # nord11 bf616a
+            BG_ACCENT=$'\033[48;5;167m' # nord11 bf616a
+            FG_ONACCENT=$'\033[38;5;236m' # nord0 2e3440
+            ;;
+        *)
+            C_BASE=$'\033[38;2;46;52;64m'      # nord0  2e3440
+            C_SURFACE=$'\033[38;2;59;66;82m'   # nord1  3b4252
+            C_GREY=$'\033[38;2;76;86;106m'     # nord3  4c566a
+            C_FG=$'\033[38;2;216;222;233m'     # nord4  d8dee9
+            C_CYAN=$'\033[38;2;136;192;208m'   # nord8  88c0d0
+            C_BLUE=$'\033[38;2;129;161;193m'   # nord9  81a1c1
+            C_RED=$'\033[38;2;191;97;106m'     # nord11 bf616a
+            C_YELLOW=$'\033[38;2;235;203;139m' # nord13 ebcb8b
+            C_GREEN=$'\033[38;2;163;190;140m'  # nord14 a3be8c
+            C_MAGENTA=$'\033[38;2;180;142;173m' # nord15 b48ead
+            C_ACCENT=$'\033[38;2;191;97;106m'  # nord11 bf616a
+            BG_ACCENT=$'\033[48;2;191;97;106m' # nord11 bf616a
+            FG_ONACCENT=$'\033[38;2;46;52;64m' # nord0  2e3440
+            ;;
+    esac
 else
-    C_RESET="" C_BOLD="" C_DIM="" C_RED="" C_GREEN="" C_YELLOW=""
-    C_BLUE="" C_MAGENTA="" C_CYAN="" C_GREY="" C_ACCENT=""
+    C_RESET="" C_BOLD="" C_DIM="" C_REV=""
+    C_BASE="" C_SURFACE="" C_GREY="" C_FG=""
+    C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_MAGENTA="" C_CYAN="" C_ACCENT=""
+    BG_ACCENT="" FG_ONACCENT=""
 fi
 
 # --- UI helpers -------------------------------------------------------------
@@ -46,25 +80,25 @@ ui_banner() {
         pad_l=$(( (width - len) / 2 ))
         pad_r=$(( width - len - pad_l ))
         printf '%s║%s%*s%s%s%s%*s%s║%s\n' \
-            "$C_CYAN$C_BOLD" "$C_RESET" "$pad_l" "" \
+            "$C_GREY$C_BOLD" "$C_RESET" "$pad_l" "" \
             "$color" "$text" "$C_RESET" "$pad_r" "" \
-            "$C_CYAN$C_BOLD" "$C_RESET"
+            "$C_GREY$C_BOLD" "$C_RESET"
     }
     local bar
     bar=$(printf '═%.0s' $(seq 1 "$width"))
 
     printf '\n'
-    printf '%s╔%s╗%s\n' "$C_CYAN$C_BOLD" "$bar" "$C_RESET"
+    printf '%s╔%s╗%s\n' "$C_GREY$C_BOLD" "$bar" "$C_RESET"
     _bline "" ""
     _bline "X 2 7   T O O L B O X" "$C_ACCENT$C_BOLD"
-    _bline "Linux desktop · homelab · gaming" "$C_GREY"
+    _bline "Linux desktop · homelab · gaming" "$C_CYAN"
     _bline "" ""
-    printf '%s╚%s╝%s\n' "$C_CYAN$C_BOLD" "$bar" "$C_RESET"
+    printf '%s╚%s╝%s\n' "$C_GREY$C_BOLD" "$bar" "$C_RESET"
     printf '%s          all-in-one installer & setup tool%s\n\n' "$C_GREY" "$C_RESET"
 }
 
 ui_rule() {
-    printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM" "$C_RESET"
+    printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM$C_GREY" "$C_RESET"
 }
 
 ui_info()    { printf '%s  ›%s %s\n'   "$C_BLUE"   "$C_RESET" "$1"; }
@@ -78,6 +112,127 @@ ui_menu_item() {
     printf '   %s%s)%s %s  %s%s%s\n' \
         "$C_ACCENT$C_BOLD" "$1" "$C_RESET" "$2" "$C_BOLD" "$3" "$C_RESET"
 }
+
+# ui_select_menu <result-var> <label1>$'\x1f'<desc1> [label2$'\x1f'desc2 ...]
+# Interactive picker: type to live-filter items by name/description/number,
+# Up/Down to move within the filtered results (the description of the
+# highlighted item is shown below the list), Enter to confirm, Esc/Ctrl-C
+# to cancel. Falls back to a plain numeric prompt when there's no
+# controlling TTY to read raw keys from (e.g. a non-interactive pipe).
+ui_select_menu() {
+    local __resultvar=$1; shift
+    local -a raw=("$@")
+    local count=${#raw[@]}
+    local -a labels=() descs=() filtered=()
+    local i
+    for ((i = 0; i < count; i++)); do
+        labels+=("${raw[i]%%$'\x1f'*}")
+        descs+=("${raw[i]#*$'\x1f'}")
+    done
+    local query="" sel=0 fcount=0 key rest n row_width=52
+
+    # Only the interactive picker needs a real controlling terminal to read
+    # raw keys from. `-r /dev/tty` can be true even without one (the device
+    # node is world-readable), so actually try to open it before committing;
+    # fall back to a plain numeric prompt on failure.
+    if ! exec 3<"$INPUT" 2>/dev/null; then
+        for ((i = 0; i < count; i++)); do
+            ui_menu_item "$((i + 1))" "" "${labels[i]}"
+            printf '        %s%s%s\n' "$C_GREY$C_DIM" "${descs[i]}" "$C_RESET"
+        done
+        printf '%s  ❯%s Enter your choice %s[1-%d]%s: ' "$C_ACCENT$C_BOLD" "$C_RESET" "$C_GREY" "$count" "$C_RESET"
+        read -r n < "$INPUT"
+        eval "$__resultvar=\$n"
+        return
+    fi
+
+    _ui_select_filter() {
+        local i lc_hay lc_query=${query,,}
+        filtered=()
+        for ((i = 0; i < count; i++)); do
+            lc_hay="${labels[i],,} ${descs[i],,}"
+            if [[ -z "$query" || "$lc_hay" == *"$lc_query"* ]]; then
+                filtered+=("$i")
+            elif [[ "$query" =~ ^[0-9]+$ ]] && [[ "$((i + 1))" == "$query"* ]]; then
+                filtered+=("$i")
+            fi
+        done
+        fcount=${#filtered[@]}
+        [ "$sel" -ge "$fcount" ] && sel=$(( fcount > 0 ? fcount - 1 : 0 ))
+    }
+
+    _ui_select_draw() {
+        printf '\r\033[2K'
+        if [ -n "$query" ]; then
+            printf '  %s🔍%s %s%s%s%s▏%s\n' "$C_CYAN" "$C_RESET" "$C_FG$C_BOLD" "$query" "$C_RESET" "$C_DIM" "$C_RESET"
+        else
+            printf '  %s🔍%s %stype to search…%s\n' "$C_CYAN" "$C_RESET" "$C_DIM$C_GREY" "$C_RESET"
+        fi
+        local j idx label
+        for ((j = 0; j < count; j++)); do
+            printf '\r\033[2K'
+            if [ "$j" -lt "$fcount" ]; then
+                idx=${filtered[j]}
+                label=$(printf '%2d) %s' "$((idx + 1))" "${labels[idx]}")
+                if [ "$j" -eq "$sel" ]; then
+                    printf '  %s ❯ %-*s%s\n' "$BG_ACCENT$FG_ONACCENT$C_BOLD" "$row_width" "$label" "$C_RESET"
+                else
+                    printf '  %s   %-*s%s\n' "$C_FG" "$row_width" "$label" "$C_RESET"
+                fi
+            elif [ "$j" -eq 0 ]; then
+                printf '  %s   no matches%s\n' "$C_GREY$C_DIM" "$C_RESET"
+            else
+                printf '\n'
+            fi
+        done
+        printf '\r\033[2K'
+        if [ "$fcount" -gt 0 ]; then
+            printf '  %s   %s%s\n' "$C_GREY$C_DIM" "${descs[${filtered[$sel]}]}" "$C_RESET"
+        else
+            printf '\n'
+        fi
+    }
+
+    _ui_select_filter
+    tput civis 2>/dev/null
+    _ui_select_draw
+    while true; do
+        IFS= read -rsn1 key <&3
+        if [[ $key == $'\x1b' ]]; then
+            IFS= read -rsn2 -t 0.01 rest <&3
+            key+="$rest"
+            case "$key" in
+                $'\x1b[A') [ "$fcount" -gt 0 ] && sel=$(( (sel - 1 + fcount) % fcount )) ;;
+                $'\x1b[B') [ "$fcount" -gt 0 ] && sel=$(( (sel + 1) % fcount )) ;;
+                $'\x1b')   sel=-1; break ;;
+            esac
+        elif [[ -z $key ]]; then
+            [ "$fcount" -gt 0 ] && break
+        elif [[ $key == $'\x03' ]]; then
+            sel=-1; break
+        elif [[ $key == $'\x7f' || $key == $'\x08' ]]; then
+            query=${query%?}
+            _ui_select_filter
+        elif [[ $key =~ [[:print:]] ]]; then
+            query+="$key"
+            sel=0
+            _ui_select_filter
+        fi
+        printf '\033[%dA' "$((count + 2))"
+        _ui_select_draw
+    done
+    tput cnorm 2>/dev/null
+    exec 3<&-
+
+    if [ "$sel" -lt 0 ] || [ "$fcount" -eq 0 ]; then
+        eval "$__resultvar="
+    else
+        eval "$__resultvar=$(( filtered[sel] + 1 ))"
+    fi
+}
+
+trap 'tput cnorm 2>/dev/null' EXIT
+trap 'tput cnorm 2>/dev/null; printf "\n"; exit 130' INT TERM
 
 # --- Repository locations ---------------------------------------------------
 # Codeberg is the primary source; GitHub is a mirror used as a fallback when
@@ -181,25 +336,32 @@ check_and_install_dependencies
 
 ui_step "Choose a script to download and run"
 ui_rule
-ui_menu_item 1 "🐧" "Fedora Desktop"
-ui_menu_item 2 "🏠" "HomeLab"
-ui_menu_item 3 "🦁" "Brave Debloat"
-ui_menu_item 4 "🎬" "YT-DLP-Easy Installer"
-ui_menu_item 5 "🍷" "Kron4ek Wine Installer"
-ui_menu_item 6 "🎮" "Proton CachyOS Installer"
-ui_menu_item 7 "💤" "Gigabyte Sleep Fix"
-ui_menu_item 8 "⚡" "Custom Fastfetch Config"
-ui_menu_item 9 "🖥️ " "Virtualization Setup"
-ui_menu_item 10 "🕹️ " "Gaming Full Stack Setup"
-ui_menu_item 11 "📦" "Flatpak Apps Install"
-ui_menu_item 12 "🔄" "Flatpak Auto-Update Setup"
-ui_rule
-printf '%s  ❯%s Enter your choice %s[1-12]%s: ' "$C_CYAN$C_BOLD" "$C_RESET" "$C_GREY" "$C_RESET"
-read -r choice < "$INPUT"
+printf '%s  type to search%s   %s↑↓%s move   %sEnter%s select   %sEsc%s cancel\n\n' \
+    "$C_GREY" "$C_RESET" "$C_GREY" "$C_RESET" "$C_GREY" "$C_RESET" "$C_GREY" "$C_RESET"
+
+ui_select_menu choice \
+    $'🐧 Desktop-Linux\x1fFedora post-install setup, Kinoite & Bazzite tweaks' \
+    $'🏠 HomeLab\x1fDocker install, auto-updates & compose updater' \
+    $'🦁 Brave\x1fDebloat & harden the Brave browser' \
+    $'🎬 YT-DLP\x1fInstall the YT-DLP-Easy video downloader' \
+    $'🍷 Wine\x1fInstall Kron4ek Wine builds for Lutris/Heroic' \
+    $'🎮 Proton\x1fInstall Proton-CachyOS for Steam' \
+    $'💤 Sleep Fix\x1fFix Gigabyte boards not waking from sleep' \
+    $'⚡ Fastfetch\x1fCustom Fastfetch config for your terminal' \
+    $'🖥️  Virtualization\x1fSet up QEMU/KVM + virt-manager' \
+    $'🕹️  Gaming Setup\x1fSteam, Wine, drivers & gaming tools' \
+    $'📦 Flatpak Apps\x1fInstall a curated set of Flatpak apps' \
+    $'🔄 Flatpak Updates\x1fEnable automatic Flatpak updates'
+printf '\n'
+
+if [ -z "$choice" ]; then
+    ui_warn "Cancelled."
+    exit 130
+fi
 
 case $choice in
     1)
-        ui_step "Fedora Desktop"
+        ui_step "Desktop-Linux"
         # Run as the normal user (NOT with sudo): Fedora.sh dispatches to
         # per-option sub-scripts that each handle privilege escalation
         # themselves as needed (Fedora-PostSetup.sh requests sudo internally
@@ -216,61 +378,61 @@ case $choice in
         sudo rm -f /tmp/X27-Homelab.sh
         ;;
     3)
-        ui_step "Brave Debloat"
+        ui_step "Brave"
         fetch_file "${CB_TOOLBOX}/Browser/make_brave_great_again.sh" "${GH_TOOLBOX}/Browser/make_brave_great_again.sh" /tmp/make_brave_great_again.sh || exit 1
         sudo bash /tmp/make_brave_great_again.sh < "$INPUT"
         sudo rm -f /tmp/make_brave_great_again.sh
         ;;
     4)
-        ui_step "YT-DLP-Easy Installer"
+        ui_step "YT-DLP"
         fetch_file "${CB_YTDLP}/Install-YT-DLP-Easy.sh" "${GH_YTDLP}/Install-YT-DLP-Easy.sh" /tmp/Install-YT-DLP-Easy.sh || exit 1
         bash /tmp/Install-YT-DLP-Easy.sh < "$INPUT"
         sudo rm -f /tmp/Install-YT-DLP-Easy.sh
         ;;
     5)
-        ui_step "Kron4ek Wine Installer"
+        ui_step "Wine"
         fetch_file "${CB_TOOLBOX}/Gaming/Kron4ek-wine-installer.sh" "${GH_TOOLBOX}/Gaming/Kron4ek-wine-installer.sh" /tmp/Kron4ek-wine-installer.sh || exit 1
         bash /tmp/Kron4ek-wine-installer.sh < "$INPUT"
         rm -f /tmp/Kron4ek-wine-installer.sh
         ;;
     6)
-        ui_step "Proton CachyOS Installer"
+        ui_step "Proton"
         fetch_file "${CB_TOOLBOX}/Gaming/proton-cachyos-installer.sh" "${GH_TOOLBOX}/Gaming/proton-cachyos-installer.sh" /tmp/proton-cachyos-installer.sh || exit 1
         bash /tmp/proton-cachyos-installer.sh < "$INPUT"
         rm -f /tmp/proton-cachyos-installer.sh
         ;;
     7)
-        ui_step "Gigabyte Sleep Fix"
+        ui_step "Sleep Fix"
         fetch_file "${CB_TOOLBOX}/Tools/GigabyteSleep-Fix.sh" "${GH_TOOLBOX}/Tools/GigabyteSleep-Fix.sh" /tmp/GigabyteSleep-Fix.sh || exit 1
         sudo bash /tmp/GigabyteSleep-Fix.sh < "$INPUT"
         sudo rm -f /tmp/GigabyteSleep-Fix.sh
         ;;
     8)
-        ui_step "Custom Fastfetch Config"
+        ui_step "Fastfetch"
         fetch_file "${CB_TOOLBOX}/Tools/fsfetch.sh" "${GH_TOOLBOX}/Tools/fsfetch.sh" /tmp/fsfetch.sh || exit 1
         bash /tmp/fsfetch.sh < "$INPUT"
         rm -f /tmp/fsfetch.sh
         ;;
     9)
-        ui_step "Virtualization Setup"
+        ui_step "Virtualization"
         fetch_file "${CB_TOOLBOX}/Tools/Virtualization_Setup.sh" "${GH_TOOLBOX}/Tools/Virtualization_Setup.sh" /tmp/Virtualization_Setup.sh || exit 1
         sudo bash /tmp/Virtualization_Setup.sh < "$INPUT"
         sudo rm -f /tmp/Virtualization_Setup.sh
         ;;
     10)
-        ui_step "Gaming Full Stack Setup"
+        ui_step "Gaming Setup"
         fetch_file "${CB_TOOLBOX}/Gaming/Gaming.sh" "${GH_TOOLBOX}/Gaming/Gaming.sh" /tmp/Gaming.sh || exit 1
         sudo bash /tmp/Gaming.sh < "$INPUT"
         sudo rm -f /tmp/Gaming.sh
         ;;
     11)
-        ui_step "Flatpak Apps Install"
+        ui_step "Flatpak Apps"
         fetch_file "${CB_TOOLBOX}/Flatpak/flatpaks.sh" "${GH_TOOLBOX}/Flatpak/flatpaks.sh" /tmp/flatpaks.sh || exit 1
         bash /tmp/flatpaks.sh < "$INPUT"
         rm -f /tmp/flatpaks.sh
         ;;
     12)
-        ui_step "Flatpak Auto-Update Setup"
+        ui_step "Flatpak Updates"
         fetch_file "${CB_TOOLBOX}/Flatpak/Flatpak-AutoUpdate-Setup.sh" "${GH_TOOLBOX}/Flatpak/Flatpak-AutoUpdate-Setup.sh" /tmp/Flatpak-AutoUpdate-Setup.sh || exit 1
         sudo bash /tmp/Flatpak-AutoUpdate-Setup.sh < "$INPUT"
         sudo rm -f /tmp/Flatpak-AutoUpdate-Setup.sh
