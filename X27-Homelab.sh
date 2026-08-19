@@ -23,10 +23,10 @@ case $choice in
         sudo rm Server-Updater.sh
         ;;
     3)
-        echo "Running Docker-Compose-Updater.sh..."
-        wget https://codeberg.org/X27/X27-Homelab-ToolBox/raw/branch/main/Scripts/Docker/Docker-Compose-Updater.sh
-        sudo bash Docker-Compose-Updater.sh
-        sudo rm Docker-Compose-Updater.sh
+        echo "Running Docker-Updater.sh..."
+        wget https://codeberg.org/X27/X27-Homelab-ToolBox/raw/branch/main/Scripts/Docker/Docker-Updater.sh
+        sudo bash Docker-Updater.sh
+        sudo rm Docker-Updater.sh
         ;;
     *)
         echo "Invalid choice. Exiting."
