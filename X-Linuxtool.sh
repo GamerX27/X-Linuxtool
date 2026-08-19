@@ -82,11 +82,19 @@ ui_menu_item() {
 # --- Repository locations ---------------------------------------------------
 # Codeberg is the primary source; GitHub is a mirror used as a fallback when
 # Codeberg cannot be reached.
-CB_TOOLBOX="https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main"
-GH_TOOLBOX="https://raw.githubusercontent.com/GamerX27/X27-Linux-Desktop-Toolbox/main"
+#
+# The Desktop and HomeLab toolboxes used to be separate repos
+# (X27-Linux-Desktop-Toolbox, X27-Homelab-ToolBox); they are now merged into
+# this repo as the Desktop/ and Homelab/ subtrees, so both are fetched from
+# X-Linuxtool itself.
+CB_BASE="https://codeberg.org/X27/X-Linuxtool/raw/branch/main"
+GH_BASE="https://raw.githubusercontent.com/GamerX27/X-Linuxtool/main"
 
-CB_HOMELAB="https://codeberg.org/X27/X27-Homelab-ToolBox/raw/branch/main"
-GH_HOMELAB="https://raw.githubusercontent.com/GamerX27/X27-Homelab-ToolBox/main"
+CB_TOOLBOX="${CB_BASE}/Desktop"
+GH_TOOLBOX="${GH_BASE}/Desktop"
+
+CB_HOMELAB="${CB_BASE}/Homelab"
+GH_HOMELAB="${GH_BASE}/Homelab"
 
 CB_YTDLP="https://codeberg.org/X27/YTDLP-Easy-Script/raw/branch/main"
 GH_YTDLP="https://raw.githubusercontent.com/GamerX27/YTDLP-Easy-Script/main"
@@ -182,16 +190,21 @@ ui_menu_item 6 "🎮" "Proton CachyOS Installer"
 ui_menu_item 7 "💤" "Gigabyte Sleep Fix"
 ui_menu_item 8 "⚡" "Custom Fastfetch Config"
 ui_menu_item 9 "🖥️ " "Virtualization Setup"
+ui_menu_item 10 "🕹️ " "Gaming Full Stack Setup"
+ui_menu_item 11 "📦" "Flatpak Apps Install"
+ui_menu_item 12 "🔄" "Flatpak Auto-Update Setup"
 ui_rule
-printf '%s  ❯%s Enter your choice %s[1-9]%s: ' "$C_CYAN$C_BOLD" "$C_RESET" "$C_GREY" "$C_RESET"
+printf '%s  ❯%s Enter your choice %s[1-12]%s: ' "$C_CYAN$C_BOLD" "$C_RESET" "$C_GREY" "$C_RESET"
 read -r choice < "$INPUT"
 
 case $choice in
     1)
         ui_step "Fedora Desktop"
-        # Run as the normal user (NOT with sudo): Fedora.sh and its sub-scripts
-        # (e.g. Fedora-PostSetup.sh) request sudo themselves and include
-        # per-user steps that must not run as root.
+        # Run as the normal user (NOT with sudo): Fedora.sh dispatches to
+        # per-option sub-scripts that each handle privilege escalation
+        # themselves as needed (Fedora-PostSetup.sh requests sudo internally
+        # for its per-user steps; Fedora-Kionite-Setup.sh and
+        # Bazzite-Setup.sh are invoked by Fedora.sh with sudo directly).
         fetch_file "${CB_TOOLBOX}/Fedora.sh" "${GH_TOOLBOX}/Fedora.sh" /tmp/Fedora.sh || exit 1
         bash /tmp/Fedora.sh < "$INPUT"
         rm -f /tmp/Fedora.sh
@@ -243,6 +256,24 @@ case $choice in
         fetch_file "${CB_TOOLBOX}/Tools/Virtualization_Setup.sh" "${GH_TOOLBOX}/Tools/Virtualization_Setup.sh" /tmp/Virtualization_Setup.sh || exit 1
         sudo bash /tmp/Virtualization_Setup.sh < "$INPUT"
         sudo rm -f /tmp/Virtualization_Setup.sh
+        ;;
+    10)
+        ui_step "Gaming Full Stack Setup"
+        fetch_file "${CB_TOOLBOX}/Gaming/Gaming.sh" "${GH_TOOLBOX}/Gaming/Gaming.sh" /tmp/Gaming.sh || exit 1
+        sudo bash /tmp/Gaming.sh < "$INPUT"
+        sudo rm -f /tmp/Gaming.sh
+        ;;
+    11)
+        ui_step "Flatpak Apps Install"
+        fetch_file "${CB_TOOLBOX}/Flatpak/flatpaks.sh" "${GH_TOOLBOX}/Flatpak/flatpaks.sh" /tmp/flatpaks.sh || exit 1
+        bash /tmp/flatpaks.sh < "$INPUT"
+        rm -f /tmp/flatpaks.sh
+        ;;
+    12)
+        ui_step "Flatpak Auto-Update Setup"
+        fetch_file "${CB_TOOLBOX}/Flatpak/Flatpak-AutoUpdate-Setup.sh" "${GH_TOOLBOX}/Flatpak/Flatpak-AutoUpdate-Setup.sh" /tmp/Flatpak-AutoUpdate-Setup.sh || exit 1
+        sudo bash /tmp/Flatpak-AutoUpdate-Setup.sh < "$INPUT"
+        sudo rm -f /tmp/Flatpak-AutoUpdate-Setup.sh
         ;;
     *)
         ui_err "Invalid choice. Exiting."

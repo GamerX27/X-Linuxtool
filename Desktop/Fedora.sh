@@ -3,8 +3,8 @@
 # --- Repository locations ---------------------------------------------------
 # Codeberg is the primary source; GitHub is a mirror used as a fallback when
 # Codeberg cannot be reached.
-CODEBERG_RAW="https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main"
-GITHUB_RAW="https://raw.githubusercontent.com/GamerX27/X27-Linux-Desktop-Toolbox/main"
+CODEBERG_RAW="https://codeberg.org/X27/X-Linuxtool/raw/branch/main/Desktop"
+GITHUB_RAW="https://raw.githubusercontent.com/GamerX27/X-Linuxtool/main/Desktop"
 
 _download() {
     # _download <url> <output-file>

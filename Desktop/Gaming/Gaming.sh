@@ -59,8 +59,8 @@ install_utilities() {
 
 ########## Extra installers (Wine TkG + Proton CachyOS) ##########
 # These scripts live in the repo's Gaming/ folder. Codeberg is primary, GitHub is fallback.
-CODEBERG_RAW_BASE="https://codeberg.org/X27/X27-Linux-Desktop-Toolbox/raw/branch/main/Gaming"
-GITHUB_RAW_BASE="https://raw.githubusercontent.com/GamerX27/X27-Linux-Desktop-Toolbox/main/Gaming"
+CODEBERG_RAW_BASE="https://codeberg.org/X27/X-Linuxtool/raw/branch/main/Desktop/Gaming"
+GITHUB_RAW_BASE="https://raw.githubusercontent.com/GamerX27/X-Linuxtool/main/Desktop/Gaming"
 
 ensure_curl() {
   have_cmd curl && return 0

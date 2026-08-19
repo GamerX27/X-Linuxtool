@@ -4,6 +4,18 @@ A simple interactive launcher for X27's collection of Linux setup and tooling sc
 
 Scripts are fetched from **Codeberg** (primary) with an automatic fallback to the **GitHub** mirror.
 
+## Repository layout
+
+The Desktop and HomeLab toolboxes used to live in their own repos
+(`X27-Linux-Desktop-Toolbox`, `X27-Homelab-ToolBox`); they are now merged into
+this repo (full history preserved) so everything ships from one place:
+
+- `Desktop/` — desktop setup scripts (Fedora, Bazzite, Gaming, Flatpak, Browser, Tools)
+- `Homelab/` — server / homelab scripts (Docker, updates)
+- `X-Linuxtool.sh` — the menu launcher, which fetches the option you pick from `Desktop/` or `Homelab/`
+
+`YTDLP-Easy-Script` remains a separate repo and is fetched from its own location.
+
 ## Run it
 
 Run directly from the web with `curl ... | bash`.
@@ -36,8 +48,8 @@ chmod +x X-Linuxtool.sh
 
 | # | Option | Description |
 |---|--------|-------------|
-| 1 | Fedora Desktop | Fedora desktop setup from the Linux Desktop Toolbox |
-| 2 | HomeLab | HomeLab setup script |
+| 1 | Fedora Desktop | Fedora desktop setup (`Desktop/Fedora.sh`) |
+| 2 | HomeLab | HomeLab setup script (`Homelab/X27-Homelab.sh`) |
 | 3 | Brave Debloat | Debloat / harden the Brave browser |
 | 4 | YT-DLP-Easy Installer | Install the YT-DLP-Easy script |
 | 5 | Kron4ek Wine Installer | Install Wine builds from Kron4ek |
@@ -45,6 +57,9 @@ chmod +x X-Linuxtool.sh
 | 7 | Gigabyte Sleep Fix | Fix sleep issues on Gigabyte boards |
 | 8 | Custom Fastfetch Config | Apply a custom Fastfetch configuration |
 | 9 | Virtualization Setup | Set up virtualization (KVM/QEMU/libvirt) |
+| 10 | Gaming Full Stack Setup | Install Steam, Wine, MangoHud, Lutris, Heroic and Discord for your distro |
+| 11 | Flatpak Apps Install | Install a curated set of Flatpak apps |
+| 12 | Flatpak Auto-Update Setup | Schedule Flatpak updates via a systemd timer |
 
 ## Requirements
 
