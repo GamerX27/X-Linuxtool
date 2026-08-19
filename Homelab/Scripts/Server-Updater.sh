@@ -20,9 +20,52 @@ CRON_DOW="*"
 SCHEDULE_DESC=""
 AUTO_REBOOT="0"
 
+# ---------------------------------------------------------------------------
+# Styling — Nord palette (same as X-Linuxtool.sh / GamingTools.sh), anchored
+# on Polar Night #2e3440 (base) and Aurora Red #bf616a (accent/error).
+# Applies only to this setup wizard's own output; the os_update.sh, the
+# update-system wrapper, the Gotify conf, and the cron file it installs are
+# literal file content and are left uncolored (os_update.sh runs
+# non-interactively via cron and its output is logged to a plain text file).
+# ---------------------------------------------------------------------------
+if [[ -t 1 ]] && [[ "${TERM:-dumb}" != "dumb" ]] && [[ -z "${NO_COLOR:-}" ]]; then
+  C_RESET=$'\e[0m'; C_BOLD=$'\e[1m'; C_DIM=$'\e[2m'
+  case "${TERM:-}" in
+    linux|screen|screen-*|tmux-*)
+      # Nearest 256-color approximations of the Nord palette.
+      C_GREY=$'\e[38;5;244m'    # nord3  4c566a
+      C_BLUE=$'\e[38;5;110m'    # nord9  81a1c1
+      C_RED=$'\e[38;5;167m'     # nord11 bf616a
+      C_YELLOW=$'\e[38;5;222m'  # nord13 ebcb8b
+      C_GREEN=$'\e[38;5;150m'   # nord14 a3be8c
+      C_MAGENTA=$'\e[38;5;139m' # nord15 b48ead
+      C_ACCENT=$'\e[38;5;167m'  # nord11 bf616a
+      ;;
+    *)
+      C_GREY=$'\e[38;2;76;86;106m'     # nord3  4c566a
+      C_BLUE=$'\e[38;2;129;161;193m'   # nord9  81a1c1
+      C_RED=$'\e[38;2;191;97;106m'     # nord11 bf616a
+      C_YELLOW=$'\e[38;2;235;203;139m' # nord13 ebcb8b
+      C_GREEN=$'\e[38;2;163;190;140m'  # nord14 a3be8c
+      C_MAGENTA=$'\e[38;2;180;142;173m' # nord15 b48ead
+      C_ACCENT=$'\e[38;2;191;97;106m'  # nord11 bf616a
+      ;;
+  esac
+else
+  C_RESET="" C_BOLD="" C_DIM=""
+  C_GREY="" C_BLUE="" C_RED="" C_YELLOW="" C_GREEN="" C_MAGENTA="" C_ACCENT=""
+fi
+
+ui_info()    { printf '%s  ›%s %s\n'   "$C_BLUE"   "$C_RESET" "$1"; }
+ui_ok()      { printf '%s  ✔%s %s\n'   "$C_GREEN"  "$C_RESET" "$1"; }
+ui_warn()    { printf '%s  ▲%s %s\n'   "$C_YELLOW" "$C_RESET" "$1"; }
+ui_err()     { printf '%s  ✖%s %s\n'   "$C_RED"    "$C_RESET" "$1" >&2; }
+ui_step()    { printf '\n%s  ➤ %s%s\n' "$C_MAGENTA$C_BOLD" "$1" "$C_RESET"; }
+ui_prompt()  { printf '%s%s%s' "$C_ACCENT$C_BOLD" "$1" "$C_RESET"; }
+
 require_root() {
   if [[ $EUID -ne 0 ]]; then
-    echo "Please run as root (e.g., sudo bash $0)" >&2
+    ui_err "Please run as root (e.g., sudo bash $0)"
     exit 1
   fi
 }
@@ -38,13 +81,13 @@ reset_existing_installation() {
   for target in "${paths[@]}"; do
     if [[ -e "$target" ]]; then
       rm -f "$target"
-      echo "[INFO] Removed previous configuration: $target"
+      ui_info "Removed previous configuration: $target"
       removed=1
     fi
   done
 
   if (( removed )); then
-    echo "[OK] Existing auto-update configuration reset."
+    ui_ok "Existing auto-update configuration reset."
   fi
 }
 
@@ -249,7 +292,7 @@ echo "===== $(date -Is) : Update finished (dry-run=$DRY_RUN) ====="
 EOF
 
   chmod 0755 "$target"
-  echo "[OK] Installed updater: $target"
+  ui_ok "Installed updater: $target"
 }
 
 install_update_command() {
@@ -265,25 +308,24 @@ else
 fi
 EOF
   chmod 0755 "$bin"
-  echo "[OK] Installed command: $bin"
+  ui_ok "Installed command: $bin"
 }
 
 configure_gotify() {
-  echo
-  echo "== Gotify Notifications (optional) =="
-  read -r -p "Configure Gotify notifications for update runs? [y/N] " GOTIFY_ANS || true
+  ui_step "Gotify Notifications (optional)"
+  read -r -p "$(ui_prompt "Configure Gotify notifications for update runs? [y/N] ")" GOTIFY_ANS || true
   if [[ "${GOTIFY_ANS,,}" != "y" ]]; then
-    echo "[INFO] Gotify notifications not configured."
+    ui_info "Gotify notifications not configured."
     return 0
   fi
 
   # Ensure curl exists before allowing configuration
   if ! command -v curl >/dev/null 2>&1; then
-    echo "[WARN] curl is required for Gotify notifications but is not installed."
-    read -r -p "Install curl now? [y/N] " CURL_ANS || true
+    ui_warn "curl is required for Gotify notifications but is not installed."
+    read -r -p "$(ui_prompt "Install curl now? [y/N] ")" CURL_ANS || true
 
     if [[ "${CURL_ANS,,}" == "y" ]]; then
-      echo "[INFO] Installing curl..."
+      ui_info "Installing curl..."
       if command -v apt-get >/dev/null 2>&1; then
         apt-get update -y && apt-get install -y curl
       elif command -v dnf >/dev/null 2>&1; then
@@ -291,41 +333,41 @@ configure_gotify() {
       elif command -v yum >/dev/null 2>&1; then
         yum -y install curl
       else
-        echo "[ERROR] Could not determine package manager to install curl."
+        ui_err "Could not determine package manager to install curl."
         exit 1
       fi
 
       if ! command -v curl >/dev/null 2>&1; then
-        echo "[ERROR] Failed to install curl; cannot enable Gotify."
+        ui_err "Failed to install curl; cannot enable Gotify."
         return 0
       fi
     else
-      echo "[INFO] Gotify cannot be enabled without curl. Skipping Gotify setup."
+      ui_warn "Gotify cannot be enabled without curl. Skipping Gotify setup."
       return 0
     fi
   fi
 
   local url token priority
   while true; do
-    read -r -p "Gotify base URL (e.g. https://gotify.example.com): " url
+    read -r -p "$(ui_prompt "Gotify base URL (e.g. https://gotify.example.com): ")" url
     url=$(echo "$url" | xargs)
     [[ -n "$url" ]] && break
-    echo "URL cannot be empty."
+    ui_warn "URL cannot be empty."
   done
 
   while true; do
-    read -r -p "Gotify application token: " token
+    read -r -p "$(ui_prompt "Gotify application token: ")" token
     token=$(echo "$token" | xargs)
     [[ -n "$token" ]] && break
-    echo "Token cannot be empty."
+    ui_warn "Token cannot be empty."
   done
 
-  read -r -p "Default Gotify priority [1-10, default 5]: " priority || true
+  read -r -p "$(ui_prompt "Default Gotify priority [1-10, default 5]: ")" priority || true
   priority=$(echo "$priority" | xargs)
   if [[ -z "$priority" ]]; then
     priority=5
   elif ! [[ "$priority" =~ ^([1-9]|10)$ ]]; then
-    echo "Invalid priority, using default 5."
+    ui_warn "Invalid priority, using default 5."
     priority=5
   fi
 
@@ -340,16 +382,15 @@ EOF
 
   chown root:root "$conf"
   chmod 600 "$conf"
-  echo "[OK] Gotify configuration saved to $conf"
+  ui_ok "Gotify configuration saved to $conf"
 }
 
 read_schedule() {
-  echo
-  echo "== Auto-Update Schedule =="
+  ui_step "Auto-Update Schedule"
 
   local MODE=""
   while true; do
-    read -r -p "Schedule monthly or weekly updates? [m/w] " MODE || true
+    read -r -p "$(ui_prompt "Schedule monthly or weekly updates? [m/w] ")" MODE || true
     MODE=$(echo "$MODE" | xargs)
     case "${MODE,,}" in
       m|monthly)
@@ -361,14 +402,14 @@ read_schedule() {
         break
         ;;
       *)
-        echo "Enter 'm' for monthly or 'w' for weekly."
+        ui_warn "Enter 'm' for monthly or 'w' for weekly."
         ;;
     esac
   done
 
   local SUMMARY=""
   if [[ "$MODE" == "weekly" ]]; then
-    echo "Enter the day of the week (mon,tue,wed,thu,fri,sat,sun or 0-6; 0/7=Sun):"
+    ui_info "Enter the day of the week (mon,tue,wed,thu,fri,sat,sun or 0-6; 0/7=Sun):"
     read -r DOW_IN
     DOW_IN=$(echo "$DOW_IN" | xargs)
 
@@ -383,7 +424,7 @@ read_schedule() {
       5|fri|friday)   DNUM=5; DNAME="Friday" ;;
       6|sat|saturday) DNUM=6; DNAME="Saturday" ;;
       *)
-        echo "Invalid day. Try again."
+        ui_err "Invalid day. Try again."
         exit 10
         ;;
     esac
@@ -392,11 +433,11 @@ read_schedule() {
     CRON_DOW="$DNUM"
     SUMMARY="$DNAME"
   else
-    echo "Enter the day of the month (1-31) for the update run:"
+    ui_info "Enter the day of the month (1-31) for the update run:"
     read -r DOM_IN
     DOM_IN=$(echo "$DOM_IN" | xargs)
     if ! [[ "$DOM_IN" =~ ^([1-9]|[12][0-9]|3[01])$ ]]; then
-      echo "Invalid day of month." >&2
+      ui_err "Invalid day of month."
       exit 12
     fi
     CRON_DOM="$DOM_IN"
@@ -405,9 +446,8 @@ read_schedule() {
     SUMMARY="day $DOM_IN of each month"
   fi
 
-  echo
-  echo "Enter a time in 24h format **HH:MM**, or one of: morning / afternoon / evening / night"
-  echo "  morning=09:00, afternoon=14:00, evening=19:00, night=02:00"
+  ui_info "Enter a time in 24h format HH:MM, or one of: morning / afternoon / evening / night"
+  ui_info "  morning=09:00, afternoon=14:00, evening=19:00, night=02:00"
   read -r WHEN
   WHEN=$(echo "$WHEN" | xargs)
 
@@ -423,7 +463,7 @@ read_schedule() {
         HH="${WHEN%:*}"
         MM="${WHEN#*:}"
       else
-        echo "Invalid time. Use HH:MM or a named period." >&2
+        ui_err "Invalid time. Use HH:MM or a named period."
         exit 11
       fi
       ;;
@@ -433,8 +473,7 @@ read_schedule() {
   CRON_HR=$(printf '%02d' "$((10#$HH))")
   SCHEDULE_DESC="$SUMMARY at $CRON_HR:$CRON_MIN"
 
-  echo
-  read -r -p "Auto-reboot if required packages update? [y/N] " REBOOT_ANS || true
+  read -r -p "$(ui_prompt "Auto-reboot if required packages update? [y/N] ")" REBOOT_ANS || true
   if [[ "${REBOOT_ANS,,}" == "y" ]]; then
     AUTO_REBOOT="1"
   else
@@ -448,7 +487,7 @@ install_cron() {
 
   # Ensure cron.d directory exists
   if [[ ! -d "$crondir" ]]; then
-    echo "[INFO] Creating $crondir..."
+    ui_info "Creating $crondir..."
     mkdir -p "$crondir"
     chmod 755 "$crondir"
   fi
@@ -469,31 +508,29 @@ EOF
 
   chown root:root "$cronfile"
   chmod 0644 "$cronfile"
-  echo "[OK] Cron installed: $cronfile"
+  ui_ok "Cron installed: $cronfile"
   if [[ -n "$SCHEDULE_DESC" ]]; then
-    echo "[OK] Will run $SCHEDULE_DESC."
+    ui_ok "Will run $SCHEDULE_DESC."
   else
-    echo "[OK] Will run at $CRON_HR:$CRON_MIN with cron DOM=$CRON_DOM MON=$CRON_MON DOW=$CRON_DOW."
+    ui_ok "Will run at $CRON_HR:$CRON_MIN with cron DOM=$CRON_DOM MON=$CRON_MON DOW=$CRON_DOW."
   fi
   if [[ "$AUTO_REBOOT" == "1" ]]; then
-    echo "[OK] Auto-reboot: ENABLED"
+    ui_ok "Auto-reboot: ENABLED"
   else
-    echo "[OK] Auto-reboot: disabled"
+    ui_info "Auto-reboot: disabled"
   fi
-  echo "    Log: /var/log/os_update.log"
+  ui_info "Log: /var/log/os_update.log"
 }
 
 maybe_offer_run() {
-  echo
-  read -r -p "Run an update now? [y/N] " RUNNOW || true
+  read -r -p "$(ui_prompt "Run an update now? [y/N] ")" RUNNOW || true
   if [[ "${RUNNOW,,}" == "y" ]]; then
     /usr/local/bin/update-system
   fi
 
-  echo
-  echo "To uninstall:"
-  echo "  sudo rm -f /etc/cron.d/os_auto_update /usr/local/bin/update-system /usr/local/sbin/os_update.sh /etc/os_update_gotify.conf"
-  echo "  sudo systemctl restart cron 2>/dev/null || sudo systemctl restart crond 2>/dev/null || true"
+  ui_step "To uninstall"
+  printf '  %ssudo rm -f /etc/cron.d/os_auto_update /usr/local/bin/update-system /usr/local/sbin/os_update.sh /etc/os_update_gotify.conf%s\n' "$C_DIM" "$C_RESET"
+  printf '  %ssudo systemctl restart cron 2>/dev/null || sudo systemctl restart crond 2>/dev/null || true%s\n' "$C_DIM" "$C_RESET"
 }
 
 main() {

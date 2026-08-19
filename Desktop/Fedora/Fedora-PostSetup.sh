@@ -32,18 +32,58 @@
 
 set -uo pipefail
 
+# --- Theme / colors ---------------------------------------------------------
+# Same Nord palette as X-Linuxtool.sh, anchored on Polar Night #2e3440
+# (base/border) and Aurora Red #bf616a (accent/selection).
+if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
+    C_RESET=$'\033[0m'
+    C_BOLD=$'\033[1m'
+    C_DIM=$'\033[2m'
+
+    case "${TERM:-}" in
+        linux|screen|screen-*|tmux-*)
+            # Nearest 256-color approximations of the Nord palette.
+            C_GREY=$'\033[38;5;244m'    # nord3  4c566a
+            C_FG=$'\033[38;5;253m'      # nord4  d8dee9
+            C_BLUE=$'\033[38;5;110m'    # nord9  81a1c1
+            C_RED=$'\033[38;5;167m'     # nord11 bf616a
+            C_YELLOW=$'\033[38;5;222m'  # nord13 ebcb8b
+            C_GREEN=$'\033[38;5;150m'   # nord14 a3be8c
+            C_MAGENTA=$'\033[38;5;139m' # nord15 b48ead
+            C_ACCENT=$'\033[38;5;167m'  # nord11 bf616a
+            ;;
+        *)
+            C_GREY=$'\033[38;2;76;86;106m'     # nord3  4c566a
+            C_FG=$'\033[38;2;216;222;233m'     # nord4  d8dee9
+            C_BLUE=$'\033[38;2;129;161;193m'   # nord9  81a1c1
+            C_RED=$'\033[38;2;191;97;106m'     # nord11 bf616a
+            C_YELLOW=$'\033[38;2;235;203;139m' # nord13 ebcb8b
+            C_GREEN=$'\033[38;2;163;190;140m'  # nord14 a3be8c
+            C_MAGENTA=$'\033[38;2;180;142;173m' # nord15 b48ead
+            C_ACCENT=$'\033[38;2;191;97;106m'  # nord11 bf616a
+            ;;
+    esac
+else
+    C_RESET="" C_BOLD="" C_DIM=""
+    C_GREY="" C_FG="" C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_MAGENTA="" C_ACCENT=""
+fi
+
 # --- Helpers ----------------------------------------------------------------
 
 log() {
-    printf '\n\033[1;34m==>\033[0m \033[1m%s\033[0m\n' "$1"
+    printf '\n%s==>%s %s%s%s\n' "$C_BLUE$C_BOLD" "$C_RESET" "$C_BOLD" "$1" "$C_RESET"
+}
+
+ok() {
+    printf '%s  ✔%s %s\n' "$C_GREEN" "$C_RESET" "$1"
 }
 
 warn() {
-    printf '\033[1;33mWarning:\033[0m %s\n' "$1" >&2
+    printf '%sWarning:%s %s\n' "$C_YELLOW$C_BOLD" "$C_RESET" "$1" >&2
 }
 
 err() {
-    printf '\n\033[1;31mError:\033[0m %s\n' "$1" >&2
+    printf '\n%sError:%s %s\n' "$C_RED$C_BOLD" "$C_RESET" "$1" >&2
 }
 
 require_cmd() {
@@ -91,7 +131,7 @@ fetch_repo_file() {
 # Ask a yes/no question; returns 0 for yes, 1 for anything else (default no).
 ask_yes_no() {
     local prompt="$1" answer
-    read -rp "${prompt} [y/N]: " answer
+    read -rp "$(printf '%s%s%s %s[y/N]%s: ' "$C_FG" "$prompt" "$C_RESET" "$C_GREY" "$C_RESET")" answer
     case "${answer}" in
         [yY] | [yY][eE][sS]) return 0 ;;
         *) return 1 ;;
@@ -101,7 +141,7 @@ ask_yes_no() {
 set_locale_time() {
     log "Setting LC_TIME to C.UTF-8"
     sudo localectl set-locale LC_TIME=C.UTF-8 \
-        && echo "Successfully set LC_TIME." \
+        && ok "Successfully set LC_TIME." \
         || warn "Failed to set LC_TIME (continuing)."
 }
 
@@ -172,12 +212,12 @@ sudo dnf update -y @multimedia --setopt="install_weak_deps=False" --exclude=Pack
 # --- 6. Hardware-accelerated codecs -----------------------------------------
 
 log "Hardware-accelerated video codecs"
-echo "Select your GPU vendor for hardware-accelerated (VA-API) codecs:"
-echo "  1) Intel (recent - Broadwell/5th-gen and newer)"
-echo "  2) Intel (older - pre-Broadwell)"
-echo "  3) AMD"
-echo "  4) Skip"
-read -rp "Enter choice [1/2/3/4]: " gpu_choice
+printf '%sSelect your GPU vendor for hardware-accelerated (VA-API) codecs:%s\n' "$C_FG" "$C_RESET"
+printf '  %s1)%s Intel (recent - Broadwell/5th-gen and newer)\n' "$C_ACCENT$C_BOLD" "$C_RESET"
+printf '  %s2)%s Intel (older - pre-Broadwell)\n' "$C_ACCENT$C_BOLD" "$C_RESET"
+printf '  %s3)%s AMD\n' "$C_ACCENT$C_BOLD" "$C_RESET"
+printf '  %s4)%s Skip\n' "$C_ACCENT$C_BOLD" "$C_RESET"
+read -rp "$(printf '%sEnter choice%s %s[1/2/3/4]%s: ' "$C_FG" "$C_RESET" "$C_GREY" "$C_RESET")" gpu_choice
 
 case "${gpu_choice}" in
     1)

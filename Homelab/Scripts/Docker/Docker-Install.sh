@@ -12,6 +12,49 @@
 
 set -euo pipefail
 
+# --- Theme / colors ---------------------------------------------------------
+# Same Nord palette as X-Linuxtool.sh, anchored on Polar Night #2e3440
+# (base/border) and Aurora Red #bf616a (accent/selection).
+if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
+    C_RESET=$'\033[0m'
+    C_BOLD=$'\033[1m'
+    C_DIM=$'\033[2m'
+
+    case "${TERM:-}" in
+        linux|screen|screen-*|tmux-*)
+            # Nearest 256-color approximations of the Nord palette.
+            C_GREY=$'\033[38;5;244m'    # nord3  4c566a
+            C_FG=$'\033[38;5;253m'      # nord4  d8dee9
+            C_BLUE=$'\033[38;5;110m'    # nord9  81a1c1
+            C_RED=$'\033[38;5;167m'     # nord11 bf616a
+            C_YELLOW=$'\033[38;5;222m'  # nord13 ebcb8b
+            C_GREEN=$'\033[38;5;150m'   # nord14 a3be8c
+            C_MAGENTA=$'\033[38;5;139m' # nord15 b48ead
+            C_ACCENT=$'\033[38;5;167m'  # nord11 bf616a
+            ;;
+        *)
+            C_GREY=$'\033[38;2;76;86;106m'     # nord3  4c566a
+            C_FG=$'\033[38;2;216;222;233m'     # nord4  d8dee9
+            C_BLUE=$'\033[38;2;129;161;193m'   # nord9  81a1c1
+            C_RED=$'\033[38;2;191;97;106m'     # nord11 bf616a
+            C_YELLOW=$'\033[38;2;235;203;139m' # nord13 ebcb8b
+            C_GREEN=$'\033[38;2;163;190;140m'  # nord14 a3be8c
+            C_MAGENTA=$'\033[38;2;180;142;173m' # nord15 b48ead
+            C_ACCENT=$'\033[38;2;191;97;106m'  # nord11 bf616a
+            ;;
+    esac
+else
+    C_RESET="" C_BOLD="" C_DIM=""
+    C_GREY="" C_FG="" C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_MAGENTA="" C_ACCENT=""
+fi
+
+ui_info()    { printf '%s  ›%s %s\n'   "$C_BLUE"   "$C_RESET" "$1"; }
+ui_ok()      { printf '%s  ✔%s %s\n'   "$C_GREEN"  "$C_RESET" "$1"; }
+ui_warn()    { printf '%s  ▲%s %s\n'   "$C_YELLOW" "$C_RESET" "$1"; }
+ui_err()     { printf '%s  ✖%s %s\n'   "$C_RED"    "$C_RESET" "$1" >&2; }
+ui_step()    { printf '\n%s  ➤ %s%s\n' "$C_MAGENTA$C_BOLD" "$1" "$C_RESET"; }
+ui_rule()    { printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM$C_GREY" "$C_RESET"; }
+
 # The user who should be added to the docker group.
 # When run via sudo this resolves to the original (non-root) user.
 TARGET_USER="${SUDO_USER:-${USER:-}}"
@@ -20,7 +63,7 @@ is_cmd() { command -v "$1" >/dev/null 2>&1; }
 
 require_root() {
   if [[ $EUID -ne 0 ]]; then
-    echo "Please run as root (e.g., sudo bash $0)" >&2
+    ui_err "Please run as root (e.g., sudo bash $0)"
     exit 1
   fi
 }
@@ -46,11 +89,11 @@ detect_family() {
   fi
 
   if [[ -z "$FAMILY" ]]; then
-    echo "[ERROR] Could not determine a supported distro family. Aborting." >&2
+    ui_err "Could not determine a supported distro family. Aborting."
     exit 2
   fi
 
-  echo "[INFO] Detected distro: ${PRETTY_NAME:-${ID:-unknown}} (family: $FAMILY)"
+  ui_info "Detected distro: ${PRETTY_NAME:-${ID:-unknown}} (family: $FAMILY)"
 }
 
 # ----------------------------------------------------------------------------
@@ -58,7 +101,7 @@ detect_family() {
 # ----------------------------------------------------------------------------
 
 remove_old_docker_debian() {
-  echo "[INFO] Checking for existing (distro-provided) Docker packages..."
+  ui_info "Checking for existing (distro-provided) Docker packages..."
   export DEBIAN_FRONTEND=noninteractive
 
   local pkgs=(
@@ -80,16 +123,16 @@ remove_old_docker_debian() {
   done
 
   if (( ${#found[@]} )); then
-    echo "[INFO] Removing conflicting packages: ${found[*]}"
+    ui_info "Removing conflicting packages: ${found[*]}"
     apt-get remove -y "${found[@]}" || true
-    echo "[OK] Removed distro-provided Docker packages."
+    ui_ok "Removed distro-provided Docker packages."
   else
-    echo "[INFO] No conflicting distro-provided Docker packages found."
+    ui_info "No conflicting distro-provided Docker packages found."
   fi
 }
 
 remove_old_docker_rhel() {
-  echo "[INFO] Checking for existing (distro-provided) Docker packages..."
+  ui_info "Checking for existing (distro-provided) Docker packages..."
 
   local mgr="dnf"
   is_cmd dnf || mgr="yum"
@@ -116,11 +159,11 @@ remove_old_docker_rhel() {
   done
 
   if (( ${#found[@]} )); then
-    echo "[INFO] Removing conflicting packages: ${found[*]}"
+    ui_info "Removing conflicting packages: ${found[*]}"
     "$mgr" remove -y "${found[@]}" || true
-    echo "[OK] Removed distro-provided Docker packages."
+    ui_ok "Removed distro-provided Docker packages."
   else
-    echo "[INFO] No conflicting distro-provided Docker packages found."
+    ui_info "No conflicting distro-provided Docker packages found."
   fi
 }
 
@@ -145,11 +188,11 @@ install_docker_debian() {
   esac
 
   if [[ -z "$codename" ]]; then
-    echo "[ERROR] Could not determine the distribution codename for the Docker repo." >&2
+    ui_err "Could not determine the distribution codename for the Docker repo."
     exit 3
   fi
 
-  echo "[INFO] Setting up Docker's official APT repository (${repo_base}, ${codename})..."
+  ui_info "Setting up Docker's official APT repository (${repo_base}, ${codename})..."
   apt-get update -y
   apt-get install -y ca-certificates curl
 
@@ -164,7 +207,7 @@ install_docker_debian() {
 deb [arch=${arch} signed-by=/etc/apt/keyrings/docker.asc] ${repo_base} ${codename} stable
 EOF
 
-  echo "[INFO] Installing Docker CE..."
+  ui_info "Installing Docker CE..."
   apt-get update -y
   apt-get install -y \
     docker-ce \
@@ -173,7 +216,7 @@ EOF
     docker-buildx-plugin \
     docker-compose-plugin
 
-  echo "[OK] Docker CE installed."
+  ui_ok "Docker CE installed."
 }
 
 install_docker_rhel() {
@@ -192,7 +235,7 @@ install_docker_rhel() {
       ;;
   esac
 
-  echo "[INFO] Setting up Docker's official repository (${repo_base})..."
+  ui_info "Setting up Docker's official repository (${repo_base})..."
 
   # Ensure config-manager plugin is available for adding repos
   if [[ "$mgr" == "dnf" ]]; then
@@ -208,7 +251,7 @@ install_docker_rhel() {
     yum-config-manager --add-repo "${repo_base}/docker-ce.repo"
   fi
 
-  echo "[INFO] Installing Docker CE..."
+  ui_info "Installing Docker CE..."
   "$mgr" install -y \
     docker-ce \
     docker-ce-cli \
@@ -216,7 +259,7 @@ install_docker_rhel() {
     docker-buildx-plugin \
     docker-compose-plugin
 
-  echo "[OK] Docker CE installed."
+  ui_ok "Docker CE installed."
 }
 
 # ----------------------------------------------------------------------------
@@ -224,42 +267,41 @@ install_docker_rhel() {
 # ----------------------------------------------------------------------------
 
 enable_service() {
-  echo "[INFO] Enabling and starting the docker service..."
+  ui_info "Enabling and starting the docker service..."
   if is_cmd systemctl; then
     systemctl enable --now docker
-    echo "[OK] docker service enabled and started."
+    ui_ok "docker service enabled and started."
   else
-    echo "[WARN] systemctl not found; please start the docker service manually."
+    ui_warn "systemctl not found; please start the docker service manually."
   fi
 }
 
 add_user_to_docker_group() {
   if [[ -z "$TARGET_USER" || "$TARGET_USER" == "root" ]]; then
-    echo "[WARN] No non-root user detected (TARGET_USER='$TARGET_USER')."
-    echo "       Run this script with sudo as your normal user, or add a user manually:"
-    echo "         sudo usermod -aG docker <username>"
+    ui_warn "No non-root user detected (TARGET_USER='$TARGET_USER')."
+    printf '%s       Run this script with sudo as your normal user, or add a user manually:%s\n' "$C_GREY$C_DIM" "$C_RESET"
+    printf '%s         sudo usermod -aG docker <username>%s\n' "$C_GREY$C_DIM" "$C_RESET"
     return 0
   fi
 
   if ! getent group docker >/dev/null 2>&1; then
-    echo "[INFO] Creating 'docker' group..."
+    ui_info "Creating 'docker' group..."
     groupadd docker
   fi
 
-  echo "[INFO] Adding user '$TARGET_USER' to the 'docker' group..."
+  ui_info "Adding user '$TARGET_USER' to the 'docker' group..."
   usermod -aG docker "$TARGET_USER"
-  echo "[OK] User '$TARGET_USER' added to the 'docker' group."
-  echo "[INFO] Log out and back in (or run 'newgrp docker') for the group change to take effect."
+  ui_ok "User '$TARGET_USER' added to the 'docker' group."
+  ui_info "Log out and back in (or run 'newgrp docker') for the group change to take effect."
 }
 
 verify_install() {
-  echo
-  echo "== Verification =="
+  ui_step "Verification"
   if is_cmd docker; then
     docker --version || true
     docker compose version 2>/dev/null || true
   else
-    echo "[WARN] docker command not found on PATH."
+    ui_warn "docker command not found on PATH."
   fi
 }
 
@@ -279,8 +321,7 @@ main() {
   add_user_to_docker_group
   verify_install
 
-  echo
-  echo "[OK] Docker installation complete."
+  ui_ok "Docker installation complete."
 }
 
 main "$@"

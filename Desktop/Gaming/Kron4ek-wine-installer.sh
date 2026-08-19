@@ -6,16 +6,59 @@
 
 set -euo pipefail
 
+# --- Theme / colors ---------------------------------------------------------
+# Same Nord palette as X-Linuxtool.sh, anchored on Polar Night #2e3440
+# (base/border) and Aurora Red #bf616a (accent/selection).
+if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
+    C_RESET=$'\033[0m'
+    C_BOLD=$'\033[1m'
+    C_DIM=$'\033[2m'
+
+    case "${TERM:-}" in
+        linux|screen|screen-*|tmux-*)
+            # Nearest 256-color approximations of the Nord palette.
+            C_GREY=$'\033[38;5;244m'    # nord3  4c566a
+            C_FG=$'\033[38;5;253m'      # nord4  d8dee9
+            C_BLUE=$'\033[38;5;110m'    # nord9  81a1c1
+            C_RED=$'\033[38;5;167m'     # nord11 bf616a
+            C_YELLOW=$'\033[38;5;222m'  # nord13 ebcb8b
+            C_GREEN=$'\033[38;5;150m'   # nord14 a3be8c
+            C_MAGENTA=$'\033[38;5;139m' # nord15 b48ead
+            C_ACCENT=$'\033[38;5;167m'  # nord11 bf616a
+            ;;
+        *)
+            C_GREY=$'\033[38;2;76;86;106m'     # nord3  4c566a
+            C_FG=$'\033[38;2;216;222;233m'     # nord4  d8dee9
+            C_BLUE=$'\033[38;2;129;161;193m'   # nord9  81a1c1
+            C_RED=$'\033[38;2;191;97;106m'     # nord11 bf616a
+            C_YELLOW=$'\033[38;2;235;203;139m' # nord13 ebcb8b
+            C_GREEN=$'\033[38;2;163;190;140m'  # nord14 a3be8c
+            C_MAGENTA=$'\033[38;2;180;142;173m' # nord15 b48ead
+            C_ACCENT=$'\033[38;2;191;97;106m'  # nord11 bf616a
+            ;;
+    esac
+else
+    C_RESET="" C_BOLD="" C_DIM=""
+    C_GREY="" C_FG="" C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_MAGENTA="" C_ACCENT=""
+fi
+
+ui_info()    { printf '%s  ›%s %s\n'   "$C_BLUE"   "$C_RESET" "$1"; }
+ui_ok()      { printf '%s  ✔%s %s\n'   "$C_GREEN"  "$C_RESET" "$1"; }
+ui_warn()    { printf '%s  ▲%s %s\n'   "$C_YELLOW" "$C_RESET" "$1"; }
+ui_err()     { printf '%s  ✖%s %s\n'   "$C_RED"    "$C_RESET" "$1" >&2; }
+ui_step()    { printf '\n%s  ➤ %s%s\n' "$C_MAGENTA$C_BOLD" "$1" "$C_RESET"; }
+ui_rule()    { printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM$C_GREY" "$C_RESET"; }
+
 REPO="Kron4ek/Wine-Builds"
 API_URL="https://api.github.com/repos/${REPO}/releases/latest"
 
 # --- do not run as root
 if [[ "$(id -u)" -eq 0 ]]; then
-  echo "Do not run as root. Run as your normal user." >&2
+  ui_err "Do not run as root. Run as your normal user."
   exit 1
 fi
 
-need() { command -v "$1" >/dev/null 2>&1 || { echo "Error: '$1' is required but missing." >&2; exit 1; }; }
+need() { command -v "$1" >/dev/null 2>&1 || { ui_err "'$1' is required but missing."; exit 1; }; }
 need curl
 need tar
 
@@ -80,21 +123,21 @@ fi
 [[ "${FORCE_BOTTLES_FLATPAK:-}" == "1"    ]] && add_target "$BOTTLES_FLATPAK_RUNNERS" "Bottles (Flatpak, forced)"
 
 if [[ "${#targets[@]}" -eq 0 ]]; then
-  echo "No compatible targets detected."
-  echo "Tip: launch Lutris, Heroic, or Bottles (Flatpak) once so config dirs exist."
-  echo "Or use FORCE_*=1 to force installation."
+  ui_err "No compatible targets detected."
+  ui_info "Tip: launch Lutris, Heroic, or Bottles (Flatpak) once so config dirs exist."
+  ui_info "Or use FORCE_*=1 to force installation."
   exit 1
 fi
 
-echo "Detected targets:"
+ui_info "Detected targets:"
 for d in "${detected[@]}"; do echo " - $d"; done
-echo "Install paths:"
+ui_info "Install paths:"
 for t in "${targets[@]}"; do echo " - $t"; done
 echo
 
+ui_step "Querying latest release..."
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 
-echo "Querying latest release..."
 JSON="$(curl -fsSL "${AUTH_HEADER[@]}" "$API_URL")"
 
 # --- Select latest Wine Staging TkG amd64 asset
@@ -135,15 +178,15 @@ PY
 fi
 
 if [[ -z "${ASSET_URL:-}" ]]; then
-  echo "Error: no Wine Staging TkG amd64 asset found in latest release"
+  ui_err "no Wine Staging TkG amd64 asset found in latest release"
   exit 1
 fi
 
-echo "Latest release tag: $TAG"
-echo "Downloading $ASSET_NAME..."
+ui_info "Latest release tag: $TAG"
+ui_info "Downloading $ASSET_NAME..."
 curl -fL --retry 3 "${AUTH_HEADER[@]}" -o "$TMP/$ASSET_NAME" "$ASSET_URL"
 
-echo "Extracting..."
+ui_info "Extracting..."
 EXTRACT_DIR="$TMP/extract"
 mkdir -p "$EXTRACT_DIR"
 
@@ -154,42 +197,42 @@ case "$ASSET_NAME" in
     elif command -v zstd >/dev/null; then
       tar --use-compress-program='zstd -d --stdout' -xf "$TMP/$ASSET_NAME" -C "$EXTRACT_DIR"
     else
-      echo "Need zstd/unzstd to extract .tar.zst"; exit 1
+      ui_err "Need zstd/unzstd to extract .tar.zst"; exit 1
     fi
     ;;
   *.tar.xz)  tar -xJf "$TMP/$ASSET_NAME" -C "$EXTRACT_DIR" ;;
   *.tar.gz|*.tgz) tar -xzf "$TMP/$ASSET_NAME" -C "$EXTRACT_DIR" ;;
   *.tar.bz2) tar -xjf "$TMP/$ASSET_NAME" -C "$EXTRACT_DIR" ;;
-  *) echo "Unknown archive format: $ASSET_NAME"; exit 1 ;;
+  *) ui_err "Unknown archive format: $ASSET_NAME"; exit 1 ;;
 esac
 
 NEW_DIR_SRC="$(find "$EXTRACT_DIR" -type f -path '*/bin/wine' -printf '%h\n' -quit | sed 's#/bin$##')"
 if [[ -z "$NEW_DIR_SRC" ]]; then
-  echo "Error: no Wine directory found in archive"
+  ui_err "no Wine directory found in archive"
   exit 1
 fi
 
 BASENAME="$(basename "$NEW_DIR_SRC")"
 [[ -z "$BASENAME" ]] && BASENAME="wine-${TAG}-staging-tkg-amd64"
 
-echo "Preparing to install: $BASENAME"
+ui_step "Preparing to install: $BASENAME"
 
 for dest in "${targets[@]}"; do
   INSTALL_PATH="$dest/$BASENAME"
-  echo "Removing older Wine Staging TkG amd64 installs in: $dest"
+  ui_info "Removing older Wine Staging TkG amd64 installs in: $dest"
   find "$dest" -mindepth 1 -maxdepth 1 -type d \
     \( -iname 'wine-*-staging-tkg-amd64*' -o -iname 'wine-*-tkg-staging-amd64*' \) \
     ! -path "$INSTALL_PATH" -exec rm -rf {} + 2>/dev/null || true
 
-  echo "Installing to $INSTALL_PATH"
+  ui_info "Installing to $INSTALL_PATH"
   rm -rf "$INSTALL_PATH"
   cp -a "$NEW_DIR_SRC" "$INSTALL_PATH"
 done
 
 echo
-echo "Installed Wine Staging TkG (amd64) to:"
+ui_ok "Installed Wine Staging TkG (amd64) to:"
 for dest in "${targets[@]}"; do
   echo " - $dest/$BASENAME"
 done
 echo
-echo "No renaming or symlinks were created."
+ui_info "No renaming or symlinks were created."

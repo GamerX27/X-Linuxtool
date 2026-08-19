@@ -1,5 +1,56 @@
 #!/bin/bash
 
+# --- Theme / colors ---------------------------------------------------------
+# Same Nord palette as X-Linuxtool.sh, anchored on Polar Night #2e3440
+# (base/border) and Aurora Red #bf616a (accent/selection).
+if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
+    C_RESET=$'\033[0m'
+    C_BOLD=$'\033[1m'
+    C_DIM=$'\033[2m'
+
+    case "${TERM:-}" in
+        linux|screen|screen-*|tmux-*)
+            # Nearest 256-color approximations of the Nord palette.
+            C_GREY=$'\033[38;5;244m'    # nord3  4c566a
+            C_FG=$'\033[38;5;253m'      # nord4  d8dee9
+            C_BLUE=$'\033[38;5;110m'    # nord9  81a1c1
+            C_RED=$'\033[38;5;167m'     # nord11 bf616a
+            C_YELLOW=$'\033[38;5;222m'  # nord13 ebcb8b
+            C_GREEN=$'\033[38;5;150m'   # nord14 a3be8c
+            C_MAGENTA=$'\033[38;5;139m' # nord15 b48ead
+            C_ACCENT=$'\033[38;5;167m'  # nord11 bf616a
+            ;;
+        *)
+            C_GREY=$'\033[38;2;76;86;106m'     # nord3  4c566a
+            C_FG=$'\033[38;2;216;222;233m'     # nord4  d8dee9
+            C_BLUE=$'\033[38;2;129;161;193m'   # nord9  81a1c1
+            C_RED=$'\033[38;2;191;97;106m'     # nord11 bf616a
+            C_YELLOW=$'\033[38;2;235;203;139m' # nord13 ebcb8b
+            C_GREEN=$'\033[38;2;163;190;140m'  # nord14 a3be8c
+            C_MAGENTA=$'\033[38;2;180;142;173m' # nord15 b48ead
+            C_ACCENT=$'\033[38;2;191;97;106m'  # nord11 bf616a
+            ;;
+    esac
+else
+    C_RESET="" C_BOLD="" C_DIM=""
+    C_GREY="" C_FG="" C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_MAGENTA="" C_ACCENT=""
+fi
+
+ui_info()    { printf '%s  ›%s %s\n'   "$C_BLUE"   "$C_RESET" "$1"; }
+ui_ok()      { printf '%s  ✔%s %s\n'   "$C_GREEN"  "$C_RESET" "$1"; }
+ui_warn()    { printf '%s  ▲%s %s\n'   "$C_YELLOW" "$C_RESET" "$1"; }
+ui_err()     { printf '%s  ✖%s %s\n'   "$C_RED"    "$C_RESET" "$1" >&2; }
+ui_step()    { printf '\n%s  ➤ %s%s\n' "$C_MAGENTA$C_BOLD" "$1" "$C_RESET"; }
+ui_rule()    { printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM$C_GREY" "$C_RESET"; }
+
+ui_menu_item() {
+    # ui_menu_item <number> <label> <desc>
+    printf '   %s%s)%s %s%s%s  %s%s%s\n' \
+        "$C_ACCENT$C_BOLD" "$1" "$C_RESET" \
+        "$C_BOLD" "$2" "$C_RESET" \
+        "$C_GREY$C_DIM" "$3" "$C_RESET"
+}
+
 # --- Repository locations ---------------------------------------------------
 # Codeberg is the primary source; GitHub is a mirror used as a fallback when
 # Codeberg cannot be reached.
@@ -13,7 +64,7 @@ _download() {
     elif command -v wget >/dev/null 2>&1; then
         wget -q -O "$2" "$1"
     else
-        echo "ERROR: Neither curl nor wget is available." >&2
+        ui_err "Neither curl nor wget is available."
         return 1
     fi
 }
@@ -23,51 +74,70 @@ fetch_repo_file() {
     # Downloads from Codeberg (primary); falls back to the GitHub mirror.
     local rel="$1" out="$2"
 
-    echo "Fetching ${rel} from Codeberg..." >&2
+    ui_info "Fetching ${rel} from Codeberg…"
     if _download "${CODEBERG_RAW}/${rel}" "$out"; then
+        ui_ok "Downloaded from Codeberg."
         return 0
     fi
 
-    echo "Codeberg unreachable; falling back to GitHub mirror..." >&2
+    ui_warn "Codeberg unreachable; falling back to GitHub mirror…"
     if _download "${GITHUB_RAW}/${rel}" "$out"; then
+        ui_ok "Downloaded from GitHub mirror."
         return 0
     fi
 
-    echo "ERROR: Could not fetch ${rel} from Codeberg or GitHub." >&2
+    ui_err "Could not fetch ${rel} from Codeberg or GitHub."
     return 1
 }
 
-echo "Choose a script to run:"
-echo "1) Fedora Post-Setup"
-echo "2) Fedora-Kionite-Setup"
-echo "3) Bazzite Setup"
-echo -n "Enter your choice (1, 2, or 3): "
-read choice
+# Loop this submenu until the user explicitly backs out, so finishing one
+# task (e.g. Fedora Post-Setup) returns here instead of exiting the script —
+# that's what lets you run another Desktop-Linux task, or pick "Back" to
+# return to the main X-Linuxtool.sh menu.
+while true; do
+    clear 2>/dev/null
+    ui_step "Desktop-Linux"
+    ui_rule
+    ui_menu_item 1 "Fedora Post-Setup" "Fedora post-install tweaks & apps"
+    ui_menu_item 2 "Fedora-Kinoite-Setup" "Fedora Kinoite (atomic KDE) setup"
+    ui_menu_item 3 "Bazzite Setup" "Bazzite tweaks & setup"
+    ui_menu_item 0 "Back" "Return to the main menu"
+    printf '%s  ❯%s Enter your choice %s[0-3]%s: ' "$C_ACCENT$C_BOLD" "$C_RESET" "$C_GREY" "$C_RESET"
+    read choice || exit 0
 
-case $choice in
-    1)
-        echo "Downloading and running Fedora-PostSetup.sh..."
-        fetch_repo_file "Fedora/Fedora-PostSetup.sh" /tmp/Fedora-PostSetup.sh
-        chmod +x /tmp/Fedora-PostSetup.sh
-        bash /tmp/Fedora-PostSetup.sh
-        rm -f /tmp/Fedora-PostSetup.sh
-        ;;
-    2)
-        echo "Downloading and running Fedora-Kionite-Setup.sh..."
-        fetch_repo_file "Fedora/Fedora-Kionite-Setup.sh" /tmp/Fedora-Kionite-Setup.sh
-        chmod +x /tmp/Fedora-Kionite-Setup.sh
-        sudo /tmp/Fedora-Kionite-Setup.sh
-        sudo rm -f /tmp/Fedora-Kionite-Setup.sh
-        ;;
-    3)
-        echo "Downloading and running Bazzite-Setup.sh..."
-        fetch_repo_file "Bazzite/Bazzite-Setup.sh" /tmp/Bazzite-Setup.sh
-        chmod +x /tmp/Bazzite-Setup.sh
-        sudo /tmp/Bazzite-Setup.sh
-        sudo rm -f /tmp/Bazzite-Setup.sh
-        ;;
-    *)
-        echo "Invalid choice. Exiting."
-        exit 1
-        ;;
-esac
+    case $choice in
+        0)
+            ui_info "Returning to the main menu…"
+            exit 0
+            ;;
+        1)
+            ui_step "Fedora Post-Setup"
+            fetch_repo_file "Fedora/Fedora-PostSetup.sh" /tmp/Fedora-PostSetup.sh || exit 1
+            chmod +x /tmp/Fedora-PostSetup.sh
+            bash /tmp/Fedora-PostSetup.sh
+            rm -f /tmp/Fedora-PostSetup.sh
+            ;;
+        2)
+            ui_step "Fedora-Kinoite-Setup"
+            fetch_repo_file "Fedora/Fedora-Kionite-Setup.sh" /tmp/Fedora-Kionite-Setup.sh || exit 1
+            chmod +x /tmp/Fedora-Kionite-Setup.sh
+            sudo /tmp/Fedora-Kionite-Setup.sh
+            sudo rm -f /tmp/Fedora-Kionite-Setup.sh
+            ;;
+        3)
+            ui_step "Bazzite Setup"
+            fetch_repo_file "Bazzite/Bazzite-Setup.sh" /tmp/Bazzite-Setup.sh || exit 1
+            chmod +x /tmp/Bazzite-Setup.sh
+            sudo /tmp/Bazzite-Setup.sh
+            sudo rm -f /tmp/Bazzite-Setup.sh
+            ;;
+        *)
+            ui_err "Invalid choice."
+            ;;
+    esac
+
+    printf '\n'
+    printf '%s  ❯%s Press Enter to return to this menu…%s ' "$C_ACCENT$C_BOLD" "$C_RESET" "$C_GREY"
+    read -r _
+    printf '%s' "$C_RESET"
+done

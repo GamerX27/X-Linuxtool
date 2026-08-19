@@ -6,8 +6,51 @@
 
 set -euo pipefail
 
+# --- Theme / colors ---------------------------------------------------------
+# Same Nord palette as X-Linuxtool.sh, anchored on Polar Night #2e3440
+# (base/border) and Aurora Red #bf616a (accent/selection).
+if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
+    C_RESET=$'\033[0m'
+    C_BOLD=$'\033[1m'
+    C_DIM=$'\033[2m'
+
+    case "${TERM:-}" in
+        linux|screen|screen-*|tmux-*)
+            # Nearest 256-color approximations of the Nord palette.
+            C_GREY=$'\033[38;5;244m'    # nord3  4c566a
+            C_FG=$'\033[38;5;253m'      # nord4  d8dee9
+            C_BLUE=$'\033[38;5;110m'    # nord9  81a1c1
+            C_RED=$'\033[38;5;167m'     # nord11 bf616a
+            C_YELLOW=$'\033[38;5;222m'  # nord13 ebcb8b
+            C_GREEN=$'\033[38;5;150m'   # nord14 a3be8c
+            C_MAGENTA=$'\033[38;5;139m' # nord15 b48ead
+            C_ACCENT=$'\033[38;5;167m'  # nord11 bf616a
+            ;;
+        *)
+            C_GREY=$'\033[38;2;76;86;106m'     # nord3  4c566a
+            C_FG=$'\033[38;2;216;222;233m'     # nord4  d8dee9
+            C_BLUE=$'\033[38;2;129;161;193m'   # nord9  81a1c1
+            C_RED=$'\033[38;2;191;97;106m'     # nord11 bf616a
+            C_YELLOW=$'\033[38;2;235;203;139m' # nord13 ebcb8b
+            C_GREEN=$'\033[38;2;163;190;140m'  # nord14 a3be8c
+            C_MAGENTA=$'\033[38;2;180;142;173m' # nord15 b48ead
+            C_ACCENT=$'\033[38;2;191;97;106m'  # nord11 bf616a
+            ;;
+    esac
+else
+    C_RESET="" C_BOLD="" C_DIM=""
+    C_GREY="" C_FG="" C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_MAGENTA="" C_ACCENT=""
+fi
+
+ui_info()    { printf '%s  ›%s %s\n'   "$C_BLUE"   "$C_RESET" "$1"; }
+ui_ok()      { printf '%s  ✔%s %s\n'   "$C_GREEN"  "$C_RESET" "$1"; }
+ui_warn()    { printf '%s  ▲%s %s\n'   "$C_YELLOW" "$C_RESET" "$1"; }
+ui_err()     { printf '%s  ✖%s %s\n'   "$C_RED"    "$C_RESET" "$1" >&2; }
+ui_step()    { printf '\n%s  ➤ %s%s\n' "$C_MAGENTA$C_BOLD" "$1" "$C_RESET"; }
+ui_rule()    { printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM$C_GREY" "$C_RESET"; }
+
 detect_distro() {
-  echo "Detecting Linux distribution..."
+  ui_info "Detecting Linux distribution..."
   if [[ -f /etc/os-release ]]; then . /etc/os-release; fi
   case "${ID:-unknown}" in
     ubuntu|debian) PKG_MGR="apt" ;;
@@ -19,15 +62,15 @@ detect_distro() {
         *debian*) PKG_MGR="apt" ;;
         *rhel*|*fedora*) PKG_MGR="dnf" ;;
         *arch*) PKG_MGR="pacman" ;;
-        *) echo "Unsupported distribution."; exit 1 ;;
+        *) ui_err "Unsupported distribution."; exit 1 ;;
       esac
       ;;
   esac
-  echo "Detected package manager: $PKG_MGR"
+  ui_info "Detected package manager: $PKG_MGR"
 }
 
 update_system() {
-  echo "Updating package metadata..."
+  ui_info "Updating package metadata..."
   case "$PKG_MGR" in
     apt)    apt-get update -y ;;
     dnf)    dnf -y update ;;
@@ -36,7 +79,7 @@ update_system() {
 }
 
 install_packages() {
-  echo "Installing QEMU/KVM, libvirt, and virt-manager..."
+  ui_info "Installing QEMU/KVM, libvirt, and virt-manager..."
   case "$PKG_MGR" in
     apt)
       apt-get install -y \
@@ -54,15 +97,15 @@ install_packages() {
       pacman -S --needed --noconfirm qemu-full libvirt virt-manager dnsmasq bridge-utils ebtables
       ;;
   esac
-  echo "Package installation completed."
+  ui_ok "Package installation completed."
 }
 
 configure_default_network() {
-  echo "Configuring default libvirt NAT network..."
+  ui_info "Configuring default libvirt NAT network..."
 
   # Debian/Ubuntu-specific fix: disable system dnsmasq to avoid conflicts
   if [[ "$PKG_MGR" == "apt" ]]; then
-    echo "Applying Debian/Ubuntu dnsmasq fix..."
+    ui_info "Applying Debian/Ubuntu dnsmasq fix..."
     systemctl stop dnsmasq || true
     systemctl disable dnsmasq || true
   fi
@@ -90,11 +133,11 @@ EOF
 
   virsh net-start default 2>/dev/null || true
   virsh net-autostart default 2>/dev/null || true
-  echo "NAT network 'default' active on virbr0."
+  ui_ok "NAT network 'default' active on virbr0."
 }
 
 add_user_to_groups() {
-  echo "Adding user to libvirt/kvm groups..."
+  ui_info "Adding user to libvirt/kvm groups..."
   local GROUP_LIBVIRT="libvirt"
   getent group libvirt >/dev/null || { getent group libvirtd >/dev/null && GROUP_LIBVIRT="libvirtd"; }
   getent group "$GROUP_LIBVIRT" >/dev/null || groupadd "$GROUP_LIBVIRT"
@@ -103,22 +146,22 @@ add_user_to_groups() {
   if [[ -n "$USER_TO_ADD" && "$USER_TO_ADD" != "root" ]]; then
     usermod -aG "$GROUP_LIBVIRT" "$USER_TO_ADD" || true
     if getent group kvm >/dev/null; then usermod -aG kvm "$USER_TO_ADD" || true; fi
-    echo "Added $USER_TO_ADD to groups: $GROUP_LIBVIRT $(getent group kvm >/dev/null && echo 'kvm')."
+    ui_ok "Added $USER_TO_ADD to groups: $GROUP_LIBVIRT $(getent group kvm >/dev/null && echo 'kvm')."
   else
-    echo "No non-root user detected; skipping group changes."
+    ui_warn "No non-root user detected; skipping group changes."
   fi
 }
 
 enable_libvirt_service() {
-  echo "Enabling and starting libvirtd..."
+  ui_info "Enabling and starting libvirtd..."
   systemctl enable --now libvirtd.service || true
   systemctl enable --now libvirtd.socket || true
-  echo "libvirtd is enabled."
+  ui_ok "libvirtd is enabled."
 }
 
 ### main
 if [[ $EUID -ne 0 ]]; then
-  echo "Run as root (sudo)."; exit 1
+  ui_err "Run as root (sudo)."; exit 1
 fi
 
 detect_distro
@@ -128,7 +171,6 @@ configure_default_network
 enable_libvirt_service
 add_user_to_groups
 
-echo
-echo "All set. Launch 'virt-manager'."
-echo "- NAT network 'default' on virbr0 is active."
-echo "- Log out/in if group changes don’t take effect immediately."
+ui_step "All set. Launch 'virt-manager'."
+ui_info "NAT network 'default' on virbr0 is active."
+ui_warn "Log out/in if group changes don't take effect immediately."

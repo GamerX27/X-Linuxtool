@@ -47,12 +47,30 @@ COMPOSE_ROOT=""
 COMPOSE_SUBDIR="docker"
 
 # ---------------------------------------------------------------------------
-# Styling
+# Styling — Nord palette (same as X-Linuxtool.sh / GamingTools.sh), anchored
+# on Polar Night #2e3440 (base) and Aurora Red #bf616a (accent/error).
 # ---------------------------------------------------------------------------
-if [[ -t 1 ]]; then
-  C_RESET=$'\e[0m'; C_BOLD=$'\e[1m'; C_DIM=$'\e[2m'
-  C_RED=$'\e[31m'; C_GREEN=$'\e[32m'; C_YELLOW=$'\e[33m'
-  C_BLUE=$'\e[34m'; C_CYAN=$'\e[36m'; C_MAGENTA=$'\e[35m'; C_INV=$'\e[7m'
+if [[ -t 1 ]] && [[ "${TERM:-dumb}" != "dumb" ]] && [[ -z "${NO_COLOR:-}" ]]; then
+  C_RESET=$'\e[0m'; C_BOLD=$'\e[1m'; C_DIM=$'\e[2m'; C_INV=$'\e[7m'
+  case "${TERM:-}" in
+    linux|screen|screen-*|tmux-*)
+      # Nearest 256-color approximations of the Nord palette.
+      C_RED=$'\e[38;5;167m'     # nord11 bf616a
+      C_GREEN=$'\e[38;5;150m'   # nord14 a3be8c
+      C_YELLOW=$'\e[38;5;222m'  # nord13 ebcb8b
+      C_BLUE=$'\e[38;5;110m'    # nord9  81a1c1
+      C_CYAN=$'\e[38;5;116m'    # nord8  88c0d0
+      C_MAGENTA=$'\e[38;5;139m' # nord15 b48ead
+      ;;
+    *)
+      C_RED=$'\e[38;2;191;97;106m'      # nord11 bf616a
+      C_GREEN=$'\e[38;2;163;190;140m'   # nord14 a3be8c
+      C_YELLOW=$'\e[38;2;235;203;139m'  # nord13 ebcb8b
+      C_BLUE=$'\e[38;2;129;161;193m'    # nord9  81a1c1
+      C_CYAN=$'\e[38;2;136;192;208m'    # nord8  88c0d0
+      C_MAGENTA=$'\e[38;2;180;142;173m' # nord15 b48ead
+      ;;
+  esac
 else
   C_RESET="" C_BOLD="" C_DIM="" C_RED="" C_GREEN="" C_YELLOW=""
   C_BLUE="" C_CYAN="" C_MAGENTA="" C_INV=""
@@ -66,10 +84,10 @@ BOX_OFF="${C_DIM}[ ]${C_RESET}"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-die()  { echo "${C_RED}[ERROR]${C_RESET} $*" >&2; exit 1; }
-info() { echo "${C_CYAN}[INFO]${C_RESET} $*"; }
-ok()   { echo "${C_GREEN}[OK]${C_RESET} $*"; }
-warn() { echo "${C_YELLOW}[WARN]${C_RESET} $*"; }
+die()  { printf '%s  ✖%s %s\n' "$C_RED" "$C_RESET" "$*" >&2; exit 1; }
+info() { printf '%s  ›%s %s\n' "$C_BLUE" "$C_RESET" "$*"; }
+ok()   { printf '%s  ✔%s %s\n' "$C_GREEN" "$C_RESET" "$*"; }
+warn() { printf '%s  ▲%s %s\n' "$C_YELLOW" "$C_RESET" "$*"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
 abspath() {

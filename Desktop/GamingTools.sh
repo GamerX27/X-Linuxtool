@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# Script to run X27-Scripts for servers
-
 # --- Theme / colors ---------------------------------------------------------
 # Same Nord palette as X-Linuxtool.sh, anchored on Polar Night #2e3440
 # (base/border) and Aurora Red #bf616a (accent/selection).
@@ -53,11 +51,11 @@ ui_menu_item() {
         "$C_GREY$C_DIM" "$3" "$C_RESET"
 }
 
-# --- Repository location -----------------------------------------------------
+# --- Repository locations ---------------------------------------------------
 # Codeberg is the primary source; GitHub is a mirror used as a fallback when
 # Codeberg cannot be reached.
-CODEBERG_RAW="https://codeberg.org/X27/X-Linuxtool/raw/branch/main/Homelab"
-GITHUB_RAW="https://raw.githubusercontent.com/GamerX27/X-Linuxtool/main/Homelab"
+CODEBERG_RAW="https://codeberg.org/X27/X-Linuxtool/raw/branch/main/Desktop/Gaming"
+GITHUB_RAW="https://raw.githubusercontent.com/GamerX27/X-Linuxtool/main/Desktop/Gaming"
 
 _download() {
     # _download <url> <output-file>
@@ -93,16 +91,16 @@ fetch_repo_file() {
 }
 
 # Loop this submenu until the user explicitly backs out, so finishing one
-# task (e.g. installing Docker) returns here instead of exiting the script —
-# that's what lets you run another HomeLab task, or pick "Back" to return to
+# task (e.g. installing Wine) returns here instead of exiting the script —
+# that's what lets you run another Gaming task, or pick "Back" to return to
 # the main X-Linuxtool.sh menu.
 while true; do
     clear 2>/dev/null
-    ui_step "HomeLab"
+    ui_step "Proton / Wine & Gaming"
     ui_rule
-    ui_menu_item 1 "Install Docker" "Install Docker CE and add your user to the docker group"
-    ui_menu_item 2 "Auto Update setup" "Set up automatic OS/package updates"
-    ui_menu_item 3 "Docker Compose Updater" "Update running Docker Compose stacks"
+    ui_menu_item 1 "Proton-CachyOS" "Install Proton-CachyOS for Steam"
+    ui_menu_item 2 "Wine" "Install Kron4ek Wine builds for Lutris/Heroic"
+    ui_menu_item 3 "Gaming Setup" "Steam, Wine, drivers & gaming tools"
     ui_menu_item 0 "Back" "Return to the main menu"
     printf '%s  ❯%s Enter your choice %s[0-3]%s: ' "$C_ACCENT$C_BOLD" "$C_RESET" "$C_GREY" "$C_RESET"
     read choice || exit 0
@@ -113,22 +111,25 @@ while true; do
             exit 0
             ;;
         1)
-            ui_step "Install Docker"
-            fetch_repo_file "Scripts/Docker/Docker-Install.sh" Docker-Install.sh || exit 1
-            sudo bash Docker-Install.sh
-            sudo rm Docker-Install.sh
+            ui_step "Proton-CachyOS"
+            fetch_repo_file "proton-cachyos-installer.sh" /tmp/proton-cachyos-installer.sh || exit 1
+            chmod +x /tmp/proton-cachyos-installer.sh
+            bash /tmp/proton-cachyos-installer.sh
+            rm -f /tmp/proton-cachyos-installer.sh
             ;;
         2)
-            ui_step "Server-Updater"
-            fetch_repo_file "Scripts/Server-Updater.sh" Server-Updater.sh || exit 1
-            sudo bash Server-Updater.sh
-            sudo rm Server-Updater.sh
+            ui_step "Wine"
+            fetch_repo_file "Kron4ek-wine-installer.sh" /tmp/Kron4ek-wine-installer.sh || exit 1
+            chmod +x /tmp/Kron4ek-wine-installer.sh
+            bash /tmp/Kron4ek-wine-installer.sh
+            rm -f /tmp/Kron4ek-wine-installer.sh
             ;;
         3)
-            ui_step "Docker-Updater"
-            fetch_repo_file "Scripts/Docker/Docker-Updater.sh" Docker-Updater.sh || exit 1
-            sudo bash Docker-Updater.sh
-            sudo rm Docker-Updater.sh
+            ui_step "Gaming Setup"
+            fetch_repo_file "Gaming.sh" /tmp/Gaming.sh || exit 1
+            chmod +x /tmp/Gaming.sh
+            sudo /tmp/Gaming.sh
+            sudo rm -f /tmp/Gaming.sh
             ;;
         *)
             ui_err "Invalid choice."

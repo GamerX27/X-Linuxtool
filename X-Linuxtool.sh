@@ -334,111 +334,120 @@ ui_banner
 # Run dependency check before showing choices
 check_and_install_dependencies
 
-ui_step "Choose a script to download and run"
-ui_rule
-printf '%s  type to search%s   %s↑↓%s move   %sEnter%s select   %sEsc%s cancel\n\n' \
-    "$C_GREY" "$C_RESET" "$C_GREY" "$C_RESET" "$C_GREY" "$C_RESET" "$C_GREY" "$C_RESET"
+# Loop back to this menu after every script finishes, clearing the screen at
+# each transition so a script's output (or the previous menu draw) never
+# lingers behind the next screen — this is what lets you run one tool, land
+# back at the main menu, and pick another without restarting X-Linuxtool.sh.
+while true; do
+    clear 2>/dev/null
+    ui_banner
 
-ui_select_menu choice \
-    $'🐧 Desktop-Linux\x1fFedora post-install setup, Kinoite & Bazzite tweaks' \
-    $'🏠 HomeLab\x1fDocker install, auto-updates & compose updater' \
-    $'🦁 Brave\x1fDebloat & harden the Brave browser' \
-    $'🎬 YT-DLP\x1fInstall the YT-DLP-Easy video downloader' \
-    $'🍷 Wine\x1fInstall Kron4ek Wine builds for Lutris/Heroic' \
-    $'🎮 Proton\x1fInstall Proton-CachyOS for Steam' \
-    $'💤 Sleep Fix\x1fFix Gigabyte boards not waking from sleep' \
-    $'⚡ Fastfetch\x1fCustom Fastfetch config for your terminal' \
-    $'🖥️  Virtualization\x1fSet up QEMU/KVM + virt-manager' \
-    $'🕹️  Gaming Setup\x1fSteam, Wine, drivers & gaming tools' \
-    $'📦 Flatpak Apps\x1fInstall a curated set of Flatpak apps' \
-    $'🔄 Flatpak Updates\x1fEnable automatic Flatpak updates'
-printf '\n'
+    ui_step "Choose a script to download and run"
+    ui_rule
+    printf '%s  type to search%s   %s↑↓%s move   %sEnter%s select   %sEsc%s exit\n\n' \
+        "$C_GREY" "$C_RESET" "$C_GREY" "$C_RESET" "$C_GREY" "$C_RESET" "$C_GREY" "$C_RESET"
 
-if [ -z "$choice" ]; then
-    ui_warn "Cancelled."
-    exit 130
-fi
+    ui_select_menu choice \
+        $'🐧 Desktop-Linux\x1fFedora post-install setup, Kinoite & Bazzite tweaks' \
+        $'🏠 HomeLab\x1fDocker install, auto-updates & compose updater' \
+        $'🦁 Brave\x1fDebloat & harden the Brave browser' \
+        $'🎬 YT-DLP\x1fInstall the YT-DLP-Easy video downloader' \
+        $'🎮 Proton/Wine & Gaming\x1fProton-CachyOS, Kron4ek Wine builds & full gaming setup' \
+        $'💤 Sleep Fix\x1fFix Gigabyte boards not waking from sleep' \
+        $'⚡ Fastfetch\x1fCustom Fastfetch config for your terminal' \
+        $'🖥️  Virtualization\x1fSet up QEMU/KVM + virt-manager' \
+        $'📦 Flatpak Apps\x1fInstall a curated set of Flatpak apps' \
+        $'🔄 Flatpak Updates\x1fEnable automatic Flatpak updates' \
+        $'🚪 Exit\x1fQuit the toolbox'
+    printf '\n'
 
-case $choice in
-    1)
-        ui_step "Desktop-Linux"
-        # Run as the normal user (NOT with sudo): Fedora.sh dispatches to
-        # per-option sub-scripts that each handle privilege escalation
-        # themselves as needed (Fedora-PostSetup.sh requests sudo internally
-        # for its per-user steps; Fedora-Kionite-Setup.sh and
-        # Bazzite-Setup.sh are invoked by Fedora.sh with sudo directly).
-        fetch_file "${CB_TOOLBOX}/Fedora.sh" "${GH_TOOLBOX}/Fedora.sh" /tmp/Fedora.sh || exit 1
-        bash /tmp/Fedora.sh < "$INPUT"
-        rm -f /tmp/Fedora.sh
-        ;;
-    2)
-        ui_step "HomeLab"
-        fetch_file "${CB_HOMELAB}/X27-Homelab.sh" "${GH_HOMELAB}/X27-Homelab.sh" /tmp/X27-Homelab.sh || exit 1
-        sudo bash /tmp/X27-Homelab.sh < "$INPUT"
-        sudo rm -f /tmp/X27-Homelab.sh
-        ;;
-    3)
-        ui_step "Brave"
-        fetch_file "${CB_TOOLBOX}/Browser/make_brave_great_again.sh" "${GH_TOOLBOX}/Browser/make_brave_great_again.sh" /tmp/make_brave_great_again.sh || exit 1
-        sudo bash /tmp/make_brave_great_again.sh < "$INPUT"
-        sudo rm -f /tmp/make_brave_great_again.sh
-        ;;
-    4)
-        ui_step "YT-DLP"
-        fetch_file "${CB_YTDLP}/Install-YT-DLP-Easy.sh" "${GH_YTDLP}/Install-YT-DLP-Easy.sh" /tmp/Install-YT-DLP-Easy.sh || exit 1
-        bash /tmp/Install-YT-DLP-Easy.sh < "$INPUT"
-        sudo rm -f /tmp/Install-YT-DLP-Easy.sh
-        ;;
-    5)
-        ui_step "Wine"
-        fetch_file "${CB_TOOLBOX}/Gaming/Kron4ek-wine-installer.sh" "${GH_TOOLBOX}/Gaming/Kron4ek-wine-installer.sh" /tmp/Kron4ek-wine-installer.sh || exit 1
-        bash /tmp/Kron4ek-wine-installer.sh < "$INPUT"
-        rm -f /tmp/Kron4ek-wine-installer.sh
-        ;;
-    6)
-        ui_step "Proton"
-        fetch_file "${CB_TOOLBOX}/Gaming/proton-cachyos-installer.sh" "${GH_TOOLBOX}/Gaming/proton-cachyos-installer.sh" /tmp/proton-cachyos-installer.sh || exit 1
-        bash /tmp/proton-cachyos-installer.sh < "$INPUT"
-        rm -f /tmp/proton-cachyos-installer.sh
-        ;;
-    7)
-        ui_step "Sleep Fix"
-        fetch_file "${CB_TOOLBOX}/Tools/GigabyteSleep-Fix.sh" "${GH_TOOLBOX}/Tools/GigabyteSleep-Fix.sh" /tmp/GigabyteSleep-Fix.sh || exit 1
-        sudo bash /tmp/GigabyteSleep-Fix.sh < "$INPUT"
-        sudo rm -f /tmp/GigabyteSleep-Fix.sh
-        ;;
-    8)
-        ui_step "Fastfetch"
-        fetch_file "${CB_TOOLBOX}/Tools/fsfetch.sh" "${GH_TOOLBOX}/Tools/fsfetch.sh" /tmp/fsfetch.sh || exit 1
-        bash /tmp/fsfetch.sh < "$INPUT"
-        rm -f /tmp/fsfetch.sh
-        ;;
-    9)
-        ui_step "Virtualization"
-        fetch_file "${CB_TOOLBOX}/Tools/Virtualization_Setup.sh" "${GH_TOOLBOX}/Tools/Virtualization_Setup.sh" /tmp/Virtualization_Setup.sh || exit 1
-        sudo bash /tmp/Virtualization_Setup.sh < "$INPUT"
-        sudo rm -f /tmp/Virtualization_Setup.sh
-        ;;
-    10)
-        ui_step "Gaming Setup"
-        fetch_file "${CB_TOOLBOX}/Gaming/Gaming.sh" "${GH_TOOLBOX}/Gaming/Gaming.sh" /tmp/Gaming.sh || exit 1
-        sudo bash /tmp/Gaming.sh < "$INPUT"
-        sudo rm -f /tmp/Gaming.sh
-        ;;
-    11)
-        ui_step "Flatpak Apps"
-        fetch_file "${CB_TOOLBOX}/Flatpak/flatpaks.sh" "${GH_TOOLBOX}/Flatpak/flatpaks.sh" /tmp/flatpaks.sh || exit 1
-        bash /tmp/flatpaks.sh < "$INPUT"
-        rm -f /tmp/flatpaks.sh
-        ;;
-    12)
-        ui_step "Flatpak Updates"
-        fetch_file "${CB_TOOLBOX}/Flatpak/Flatpak-AutoUpdate-Setup.sh" "${GH_TOOLBOX}/Flatpak/Flatpak-AutoUpdate-Setup.sh" /tmp/Flatpak-AutoUpdate-Setup.sh || exit 1
-        sudo bash /tmp/Flatpak-AutoUpdate-Setup.sh < "$INPUT"
-        sudo rm -f /tmp/Flatpak-AutoUpdate-Setup.sh
-        ;;
-    *)
-        ui_err "Invalid choice. Exiting."
-        exit 1
-        ;;
-esac
+    if [ -z "$choice" ] || [ "$choice" -eq 11 ]; then
+        clear 2>/dev/null
+        ui_ok "Goodbye."
+        exit 0
+    fi
+
+    # Hide the main menu while the chosen script runs, so its output starts
+    # on a clean screen instead of stacking under the menu we just drew.
+    clear 2>/dev/null
+
+    case $choice in
+        1)
+            ui_step "Desktop-Linux"
+            # Run as the normal user (NOT with sudo): Fedora.sh dispatches to
+            # per-option sub-scripts that each handle privilege escalation
+            # themselves as needed (Fedora-PostSetup.sh requests sudo internally
+            # for its per-user steps; Fedora-Kionite-Setup.sh and
+            # Bazzite-Setup.sh are invoked by Fedora.sh with sudo directly).
+            fetch_file "${CB_TOOLBOX}/Fedora.sh" "${GH_TOOLBOX}/Fedora.sh" /tmp/Fedora.sh || exit 1
+            bash /tmp/Fedora.sh < "$INPUT"
+            rm -f /tmp/Fedora.sh
+            ;;
+        2)
+            ui_step "HomeLab"
+            fetch_file "${CB_HOMELAB}/X27-Homelab.sh" "${GH_HOMELAB}/X27-Homelab.sh" /tmp/X27-Homelab.sh || exit 1
+            sudo bash /tmp/X27-Homelab.sh < "$INPUT"
+            sudo rm -f /tmp/X27-Homelab.sh
+            ;;
+        3)
+            ui_step "Brave"
+            fetch_file "${CB_TOOLBOX}/Browser/make_brave_great_again.sh" "${GH_TOOLBOX}/Browser/make_brave_great_again.sh" /tmp/make_brave_great_again.sh || exit 1
+            sudo bash /tmp/make_brave_great_again.sh < "$INPUT"
+            sudo rm -f /tmp/make_brave_great_again.sh
+            ;;
+        4)
+            ui_step "YT-DLP"
+            fetch_file "${CB_YTDLP}/Install-YT-DLP-Easy.sh" "${GH_YTDLP}/Install-YT-DLP-Easy.sh" /tmp/Install-YT-DLP-Easy.sh || exit 1
+            bash /tmp/Install-YT-DLP-Easy.sh < "$INPUT"
+            sudo rm -f /tmp/Install-YT-DLP-Easy.sh
+            ;;
+        5)
+            ui_step "Proton/Wine & Gaming"
+            # Run as the normal user (NOT with sudo): GamingTools.sh dispatches to
+            # per-option sub-scripts that each handle privilege escalation
+            # themselves as needed (Wine and Proton run as the normal user;
+            # Gaming Setup is invoked by GamingTools.sh with sudo directly).
+            fetch_file "${CB_TOOLBOX}/GamingTools.sh" "${GH_TOOLBOX}/GamingTools.sh" /tmp/GamingTools.sh || exit 1
+            bash /tmp/GamingTools.sh < "$INPUT"
+            rm -f /tmp/GamingTools.sh
+            ;;
+        6)
+            ui_step "Sleep Fix"
+            fetch_file "${CB_TOOLBOX}/Tools/GigabyteSleep-Fix.sh" "${GH_TOOLBOX}/Tools/GigabyteSleep-Fix.sh" /tmp/GigabyteSleep-Fix.sh || exit 1
+            sudo bash /tmp/GigabyteSleep-Fix.sh < "$INPUT"
+            sudo rm -f /tmp/GigabyteSleep-Fix.sh
+            ;;
+        7)
+            ui_step "Fastfetch"
+            fetch_file "${CB_TOOLBOX}/Tools/fsfetch.sh" "${GH_TOOLBOX}/Tools/fsfetch.sh" /tmp/fsfetch.sh || exit 1
+            bash /tmp/fsfetch.sh < "$INPUT"
+            rm -f /tmp/fsfetch.sh
+            ;;
+        8)
+            ui_step "Virtualization"
+            fetch_file "${CB_TOOLBOX}/Tools/Virtualization_Setup.sh" "${GH_TOOLBOX}/Tools/Virtualization_Setup.sh" /tmp/Virtualization_Setup.sh || exit 1
+            sudo bash /tmp/Virtualization_Setup.sh < "$INPUT"
+            sudo rm -f /tmp/Virtualization_Setup.sh
+            ;;
+        9)
+            ui_step "Flatpak Apps"
+            fetch_file "${CB_TOOLBOX}/Flatpak/flatpaks.sh" "${GH_TOOLBOX}/Flatpak/flatpaks.sh" /tmp/flatpaks.sh || exit 1
+            bash /tmp/flatpaks.sh < "$INPUT"
+            rm -f /tmp/flatpaks.sh
+            ;;
+        10)
+            ui_step "Flatpak Updates"
+            fetch_file "${CB_TOOLBOX}/Flatpak/Flatpak-AutoUpdate-Setup.sh" "${GH_TOOLBOX}/Flatpak/Flatpak-AutoUpdate-Setup.sh" /tmp/Flatpak-AutoUpdate-Setup.sh || exit 1
+            sudo bash /tmp/Flatpak-AutoUpdate-Setup.sh < "$INPUT"
+            sudo rm -f /tmp/Flatpak-AutoUpdate-Setup.sh
+            ;;
+        *)
+            ui_err "Invalid choice."
+            ;;
+    esac
+
+    printf '\n'
+    printf '%s  ❯%s Press Enter to return to the main menu…%s ' "$C_ACCENT$C_BOLD" "$C_RESET" "$C_GREY"
+    read -r _ < "$INPUT"
+    printf '%s' "$C_RESET"
+done

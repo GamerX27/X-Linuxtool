@@ -5,6 +5,48 @@
 # It may say in the privacy settings the mic and camera are still on, but they are blocked from being accessed.
 set -e
 
+# --- Theme / colors ---------------------------------------------------------
+# Same Nord palette as X-Linuxtool.sh, anchored on Polar Night #2e3440
+# (base/border) and Aurora Red #bf616a (accent/selection).
+if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
+    C_RESET=$'\033[0m'
+    C_BOLD=$'\033[1m'
+    C_DIM=$'\033[2m'
+
+    case "${TERM:-}" in
+        linux|screen|screen-*|tmux-*)
+            # Nearest 256-color approximations of the Nord palette.
+            C_GREY=$'\033[38;5;244m'    # nord3  4c566a
+            C_FG=$'\033[38;5;253m'      # nord4  d8dee9
+            C_BLUE=$'\033[38;5;110m'    # nord9  81a1c1
+            C_RED=$'\033[38;5;167m'     # nord11 bf616a
+            C_YELLOW=$'\033[38;5;222m'  # nord13 ebcb8b
+            C_GREEN=$'\033[38;5;150m'   # nord14 a3be8c
+            C_MAGENTA=$'\033[38;5;139m' # nord15 b48ead
+            C_ACCENT=$'\033[38;5;167m'  # nord11 bf616a
+            ;;
+        *)
+            C_GREY=$'\033[38;2;76;86;106m'     # nord3  4c566a
+            C_FG=$'\033[38;2;216;222;233m'     # nord4  d8dee9
+            C_BLUE=$'\033[38;2;129;161;193m'   # nord9  81a1c1
+            C_RED=$'\033[38;2;191;97;106m'     # nord11 bf616a
+            C_YELLOW=$'\033[38;2;235;203;139m' # nord13 ebcb8b
+            C_GREEN=$'\033[38;2;163;190;140m'  # nord14 a3be8c
+            C_MAGENTA=$'\033[38;2;180;142;173m' # nord15 b48ead
+            C_ACCENT=$'\033[38;2;191;97;106m'  # nord11 bf616a
+            ;;
+    esac
+else
+    C_RESET="" C_BOLD="" C_DIM=""
+    C_GREY="" C_FG="" C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_MAGENTA="" C_ACCENT=""
+fi
+
+ui_info()    { printf '%s  ›%s %s\n'   "$C_BLUE"   "$C_RESET" "$1"; }
+ui_ok()      { printf '%s  ✔%s %s\n'   "$C_GREEN"  "$C_RESET" "$1"; }
+ui_warn()    { printf '%s  ▲%s %s\n'   "$C_YELLOW" "$C_RESET" "$1"; }
+ui_err()     { printf '%s  ✖%s %s\n'   "$C_RED"    "$C_RESET" "$1" >&2; }
+ui_step()    { printf '\n%s  ➤ %s%s\n' "$C_MAGENTA$C_BOLD" "$1" "$C_RESET"; }
+ui_rule()    { printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM$C_GREY" "$C_RESET"; }
 
 # ---- Detect Brave Flatpak & scope (system/user) ----
 has_brave_flatpak() {
@@ -76,59 +118,56 @@ sudo tee /etc/brave/policies/managed/make_brave_great_again.json >/dev/null <<'J
 }
 JSON
 
-echo "Brave policies written: /etc/brave/policies/managed/make_brave_great_again.json"
+ui_ok "Brave policies written: /etc/brave/policies/managed/make_brave_great_again.json"
 
 # If Brave is the Flatpak, grant it read-only access to the policies dir
 if has_brave_flatpak; then
   scope="$(brave_flatpak_scope)"
   if [ "$scope" = "system" ]; then
-    echo "Detected Brave (Flatpak, system install) — applying filesystem override..."
+    ui_info "Detected Brave (Flatpak, system install) — applying filesystem override..."
     sudo flatpak override --system com.brave.Browser --filesystem=/etc/brave/policies/managed:ro
   else
-    echo "Detected Brave (Flatpak, user install) — applying filesystem override..."
+    ui_info "Detected Brave (Flatpak, user install) — applying filesystem override..."
     flatpak override --user com.brave.Browser --filesystem=/etc/brave/policies/managed:ro
   fi
-  echo "Flatpak override applied."
+  ui_ok "Flatpak override applied."
 else
-  echo "Brave Flatpak not detected — no Flatpak override needed."
+  ui_warn "Brave Flatpak not detected — no Flatpak override needed."
 fi
 
 # ---- Add Brave telemetry domains to /etc/hosts ----
-echo "Adding Brave telemetry domains to /etc/hosts:"
-echo " - variations.brave.com"
-echo " - safebrowsing.brave.com"
-echo " - analytics.brave.com"
+ui_step "Adding Brave telemetry domains to /etc/hosts"
+ui_info " - variations.brave.com"
+ui_info " - safebrowsing.brave.com"
+ui_info " - analytics.brave.com"
 
 if ! grep -q "variations.brave.com" /etc/hosts; then
-  echo "Adding variations.brave.com..."
+  ui_info "Adding variations.brave.com..."
   echo -e "0.0.0.0 variations.brave.com\n:: variations.brave.com" | sudo tee -a /etc/hosts >/dev/null
-  echo "variations.brave.com entries added."
+  ui_ok "variations.brave.com entries added."
 else
-  echo "variations.brave.com already exists in /etc/hosts. Skipping."
+  ui_warn "variations.brave.com already exists in /etc/hosts. Skipping."
 fi
 
 if ! grep -q "safebrowsing.brave.com" /etc/hosts; then
-  echo "Adding safebrowsing.brave.com..."
+  ui_info "Adding safebrowsing.brave.com..."
   echo -e "0.0.0.0 safebrowsing.brave.com\n:: safebrowsing.brave.com" | sudo tee -a /etc/hosts >/dev/null
-  echo "safebrowsing.brave.com entries added."
+  ui_ok "safebrowsing.brave.com entries added."
 else
-  echo "safebrowsing.brave.com already exists in /etc/hosts. Skipping."
+  ui_warn "safebrowsing.brave.com already exists in /etc/hosts. Skipping."
 fi
 
 if ! grep -q "analytics.brave.com" /etc/hosts; then
-  echo "Adding analytics.brave.com..."
+  ui_info "Adding analytics.brave.com..."
   echo -e "0.0.0.0 analytics.brave.com\n:: analytics.brave.com" | sudo tee -a /etc/hosts >/dev/null
-  echo "analytics.brave.com entries added."
+  ui_ok "analytics.brave.com entries added."
 else
-  echo "analytics.brave.com already exists in /etc/hosts. Skipping."
+  ui_warn "analytics.brave.com already exists in /etc/hosts. Skipping."
 fi
 # ---------------------------------------------------
 
 
-
-
-
-echo "All done."
+ui_ok "All done."
 
 
 # Credits
