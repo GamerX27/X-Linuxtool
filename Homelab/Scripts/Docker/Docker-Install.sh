@@ -9,6 +9,15 @@
 #   - Enables and starts the docker service
 #   - Adds the invoking (non-root) user to the "docker" group so they can run
 #     docker commands without sudo
+#
+# Usage:
+#   sudo bash Docker-Install.sh [--user NAME]
+#
+# Target-user detection (for the docker group add) does NOT rely solely on
+# $SUDO_USER, because this script is commonly invoked from another script
+# that is already running as root (e.g. via X27-Homelab.sh), and a nested
+# `sudo` call made *by root* resets SUDO_USER to "root" rather than the
+# original login user. See detect_target_user() below.
 
 set -euo pipefail
 
@@ -55,11 +64,99 @@ ui_err()     { printf '%s  ✖%s %s\n'   "$C_RED"    "$C_RESET" "$1" >&2; }
 ui_step()    { printf '\n%s  ➤ %s%s\n' "$C_MAGENTA$C_BOLD" "$1" "$C_RESET"; }
 ui_rule()    { printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM$C_GREY" "$C_RESET"; }
 
-# The user who should be added to the docker group.
-# When run via sudo this resolves to the original (non-root) user.
-TARGET_USER="${SUDO_USER:-${USER:-}}"
+# The user who should be added to the docker group. Resolved by
+# detect_target_user() below (called from main, after arg parsing).
+TARGET_USER=""
+CLI_TARGET_USER=""
 
 is_cmd() { command -v "$1" >/dev/null 2>&1; }
+
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -u|--user)
+        [[ $# -ge 2 ]] || { ui_err "Missing value for $1"; exit 1; }
+        CLI_TARGET_USER="$2"
+        shift 2
+        ;;
+      --user=*)
+        CLI_TARGET_USER="${1#*=}"
+        shift
+        ;;
+      -h|--help)
+        printf 'Usage: sudo bash %s [--user NAME]\n' "$(basename "$0")"
+        printf '  --user NAME   Add NAME to the docker group instead of auto-detecting it.\n'
+        exit 0
+        ;;
+      *)
+        # Accept a bare positional username too, for convenience.
+        CLI_TARGET_USER="$1"
+        shift
+        ;;
+    esac
+  done
+}
+
+# Determine the non-root user that should be added to the docker group.
+#
+# SUDO_USER alone is not reliable: when this script is invoked via a nested
+# `sudo` call made by a process that is already root (e.g. X27-Homelab.sh,
+# itself launched with sudo, doing `sudo bash Docker-Install.sh`), sudo sets
+# SUDO_USER to the user who ran *that* sudo command - which is root - so the
+# original login name is lost. The kernel's login uid (surfaced via
+# /proc/self/loginuid, the same mechanism `logname` uses) is set once at
+# login and survives any number of nested su/sudo calls, so it's used as the
+# primary source of truth here.
+#
+# Preference order:
+#   1. --user/-u flag, if explicitly given
+#   2. Kernel login uid (robust across nested sudo)
+#   3. `logname` (falls back to the same mechanism)
+#   4. SUDO_USER, if set and not root
+#   5. PKEXEC_UID, for polkit-based invocations
+#   6. $USER, if not root
+detect_target_user() {
+  local candidate=""
+
+  if [[ -n "$CLI_TARGET_USER" ]]; then
+    candidate="$CLI_TARGET_USER"
+  fi
+
+  if [[ -z "$candidate" ]]; then
+    local login_uid
+    login_uid="$(cat /proc/self/loginuid 2>/dev/null || true)"
+    # 4294967295 (-1 unsigned) means "no login uid recorded"
+    if [[ -n "$login_uid" && "$login_uid" != "4294967295" && "$login_uid" != "0" ]]; then
+      candidate="$(id -un "$login_uid" 2>/dev/null || true)"
+    fi
+  fi
+
+  if [[ -z "$candidate" ]] && is_cmd logname; then
+    local ln
+    ln="$(logname 2>/dev/null || true)"
+    [[ -n "$ln" && "$ln" != "root" ]] && candidate="$ln"
+  fi
+
+  if [[ -z "$candidate" && -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
+    candidate="$SUDO_USER"
+  fi
+
+  if [[ -z "$candidate" && -n "${PKEXEC_UID:-}" ]]; then
+    candidate="$(id -un "$PKEXEC_UID" 2>/dev/null || true)"
+  fi
+
+  if [[ -z "$candidate" && -n "${USER:-}" && "$USER" != "root" ]]; then
+    candidate="$USER"
+  fi
+
+  # Validate the candidate actually exists as a user.
+  if [[ -n "$candidate" ]] && ! getent passwd "$candidate" >/dev/null 2>&1; then
+    ui_warn "Detected user '$candidate' does not exist on this system; ignoring."
+    candidate=""
+  fi
+
+  TARGET_USER="$candidate"
+}
 
 require_root() {
   if [[ $EUID -ne 0 ]]; then
@@ -278,10 +375,26 @@ enable_service() {
 
 add_user_to_docker_group() {
   if [[ -z "$TARGET_USER" || "$TARGET_USER" == "root" ]]; then
-    ui_warn "No non-root user detected (TARGET_USER='$TARGET_USER')."
-    printf '%s       Run this script with sudo as your normal user, or add a user manually:%s\n' "$C_GREY$C_DIM" "$C_RESET"
-    printf '%s         sudo usermod -aG docker <username>%s\n' "$C_GREY$C_DIM" "$C_RESET"
-    return 0
+    ui_warn "Could not auto-detect a non-root user to add to the 'docker' group."
+
+    if [[ -t 0 && -t 1 ]]; then
+      local reply
+      printf '%s       Enter the username to add to the docker group (blank to skip): %s' "$C_GREY$C_DIM" "$C_RESET"
+      read -r reply || reply=""
+      if [[ -n "$reply" ]] && getent passwd "$reply" >/dev/null 2>&1; then
+        TARGET_USER="$reply"
+      elif [[ -n "$reply" ]]; then
+        ui_warn "No such user '$reply'; skipping."
+      fi
+    fi
+
+    if [[ -z "$TARGET_USER" || "$TARGET_USER" == "root" ]]; then
+      printf '%s       Add a user manually with:%s\n' "$C_GREY$C_DIM" "$C_RESET"
+      printf '%s         sudo usermod -aG docker <username>%s\n' "$C_GREY$C_DIM" "$C_RESET"
+      printf '%s       Or re-run with:%s\n' "$C_GREY$C_DIM" "$C_RESET"
+      printf '%s         sudo bash %s --user <username>%s\n' "$C_GREY$C_DIM" "$(basename "$0")" "$C_RESET"
+      return 0
+    fi
   fi
 
   if ! getent group docker >/dev/null 2>&1; then
@@ -306,7 +419,9 @@ verify_install() {
 }
 
 main() {
+  parse_args "$@"
   require_root
+  detect_target_user
   detect_family
 
   if [[ "$FAMILY" == "debian" ]]; then
