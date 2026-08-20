@@ -280,6 +280,11 @@ curl -fsS https://dl.brave.com/install.sh | FLAVOR=origin sh \
     && ok "Brave browser installed." \
     || warn "Failed to install the Brave browser (continuing)."
 
+log "Setting Brave as the default web browser"
+xdg-settings set default-web-browser brave-origin.desktop \
+    && ok "Brave set as the default web browser." \
+    || warn "Failed to set Brave as the default web browser (continuing)."
+
 log "Applying Brave policy configuration"
 BRAVE_POLICY_SCRIPT="$(mktemp /tmp/make_brave_great_again.XXXXXX.sh)"
 fetch_repo_file "Browser/make_brave_great_again.sh" "${BRAVE_POLICY_SCRIPT}"
@@ -333,7 +338,11 @@ sudo dnf autoremove -y \
 log "Fedora post-setup complete."
 
 if ask_yes_no "Would you like to reboot now?"; then
-    log "Rebooting..."
+    log "Rebooting in..."
+    for count in 5 4 3 2 1; do
+        echo "$count"
+        sleep 1
+    done
     sudo systemctl reboot
 else
     log "Reboot skipped. Remember to reboot later to apply all changes."
