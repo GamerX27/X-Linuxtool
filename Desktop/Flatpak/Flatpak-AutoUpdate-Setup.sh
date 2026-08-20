@@ -1,11 +1,7 @@
 #!/bin/bash
 
-# Stop script immediately if any command fails
 set -e
 
-# --- Theme / colors ---------------------------------------------------------
-# Same Nord palette as X-Linuxtool.sh, anchored on Polar Night #2e3440
-# (base/border) and Aurora Red #bf616a (accent/selection).
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
     C_BOLD=$'\033[1m'
@@ -49,19 +45,16 @@ ui_rule()    { printf '%s──────────────────�
 SERVICE_FILE="/etc/systemd/system/flatpak-update.service"
 TIMER_FILE="/etc/systemd/system/flatpak-update.timer"
 
-# Check if we have root privileges (needed to write to /etc/)
 if [[ $EUID -ne 0 ]]; then
    ui_err "This script must be run as root (use sudo)."
    exit 1
 fi
 
-# 1. Check if files already exist
 if [ -f "$SERVICE_FILE" ] && [ -f "$TIMER_FILE" ]; then
     ui_warn "Flatpak auto-update service and timer already exist. Skipping deployment."
     exit 0
 fi
 
-# 2. Create the systemd service file
 ui_info "Creating service file..."
 cat <<EOF > "$SERVICE_FILE"
 [Unit]
@@ -78,7 +71,6 @@ RemainAfterExit=yes
 WantedBy=multi-user.target
 EOF
 
-# Create the systemd timer file
 ui_info "Creating timer file..."
 cat <<EOF > "$TIMER_FILE"
 [Unit]
@@ -92,13 +84,10 @@ Persistent=false
 WantedBy=timers.target
 EOF
 
-# Reload systemd to recognize new files
 ui_info "Reloading systemd daemon..."
 systemctl daemon-reload
 
-# Enable and start the timer
 ui_info "Enabling and starting the timer..."
 systemctl enable --now flatpak-update.timer
 
-# 3. Final confirmation
 ui_ok "Flatpak auto-update service and timer deployed successfully."

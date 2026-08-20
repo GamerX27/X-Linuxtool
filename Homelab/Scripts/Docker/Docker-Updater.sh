@@ -46,10 +46,6 @@ set -uo pipefail
 COMPOSE_ROOT=""
 COMPOSE_SUBDIR="docker"
 
-# ---------------------------------------------------------------------------
-# Styling — Nord palette (same as X-Linuxtool.sh / GamingTools.sh), anchored
-# on Polar Night #2e3440 (base) and Aurora Red #bf616a (accent/error).
-# ---------------------------------------------------------------------------
 if [[ -t 1 ]] && [[ "${TERM:-dumb}" != "dumb" ]] && [[ -z "${NO_COLOR:-}" ]]; then
   C_RESET=$'\e[0m'; C_BOLD=$'\e[1m'; C_DIM=$'\e[2m'; C_INV=$'\e[7m'
   case "${TERM:-}" in
@@ -81,9 +77,6 @@ CROSS="${C_RED}✘${C_RESET}"
 BOX_ON="${C_GREEN}[x]${C_RESET}"
 BOX_OFF="${C_DIM}[ ]${C_RESET}"
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 die()  { printf '%s  ✖%s %s\n' "$C_RED" "$C_RESET" "$*" >&2; exit 1; }
 info() { printf '%s  ›%s %s\n' "$C_BLUE" "$C_RESET" "$*"; }
 ok()   { printf '%s  ✔%s %s\n' "$C_GREEN" "$C_RESET" "$*"; }
@@ -170,9 +163,6 @@ remote_digest() {
   return 1
 }
 
-# ---------------------------------------------------------------------------
-# Data model (parallel arrays)
-# ---------------------------------------------------------------------------
 declare -a U_IMAGE=()     # image reference
 declare -a U_CAT=()       # compose | compose-ext | external | standalone
 declare -a U_FILE=()      # compose file (compose/compose-ext) else ""
@@ -244,9 +234,6 @@ add_candidate() {
   esac
 }
 
-# ---------------------------------------------------------------------------
-# Collection
-# ---------------------------------------------------------------------------
 # Index every running container once so we can show container names next to
 # their images (and reuse the data when classifying non-compose containers).
 build_container_index() {
@@ -358,9 +345,6 @@ reorder_by_category() {
   U_CONTAINER=("${N[@]}"); U_STATE=("${S[@]}"); U_SEL=("${L[@]}")
 }
 
-# ---------------------------------------------------------------------------
-# Interactive selection UI
-# ---------------------------------------------------------------------------
 cursor_hide() { [[ -t 1 ]] && printf '\e[?25l'; }
 cursor_show() { [[ -t 1 ]] && printf '\e[?25h'; }
 
@@ -388,7 +372,6 @@ draw_menu() {
   local count=0 i
   for i in "${!U_IMAGE[@]}"; do [[ "${U_SEL[$i]}" == "1" ]] && ((count++)); done
 
-  # Column header
   echo
   printf '    %-4s %-8s %-*s %-*s %s\n' "SEL" "STATE" "$NAME_W" "CONTAINER" "$IMG_W" "IMAGE" "SOURCE"
   printf '    %s\n' "${C_DIM}────────────────────────────────────────────────────────────────────────────────${C_RESET}"
@@ -465,9 +448,6 @@ select_images() {
   done
 }
 
-# ---------------------------------------------------------------------------
-# Standalone recreate (best-effort, via runlike)
-# ---------------------------------------------------------------------------
 ensure_runlike() {
   docker image inspect assaflavie/runlike >/dev/null 2>&1 && return 0
   info "Pulling helper image assaflavie/runlike (used to rebuild the run command)"
@@ -499,9 +479,6 @@ recreate_standalone() {
   return 1
 }
 
-# ---------------------------------------------------------------------------
-# Apply updates
-# ---------------------------------------------------------------------------
 apply_updates() {
   local -a sel=()
   local i
@@ -586,9 +563,6 @@ apply_updates() {
   ok "Done."
 }
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 usage() {
   cat <<EOF
 ${C_BOLD}Docker Updater${C_RESET}

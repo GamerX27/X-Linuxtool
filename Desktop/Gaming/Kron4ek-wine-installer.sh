@@ -6,9 +6,6 @@
 
 set -euo pipefail
 
-# --- Theme / colors ---------------------------------------------------------
-# Same Nord palette as X-Linuxtool.sh, anchored on Polar Night #2e3440
-# (base/border) and Aurora Red #bf616a (accent/selection).
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
     C_BOLD=$'\033[1m'
@@ -52,7 +49,6 @@ ui_rule()    { printf '%s──────────────────�
 REPO="Kron4ek/Wine-Builds"
 API_URL="https://api.github.com/repos/${REPO}/releases/latest"
 
-# --- do not run as root
 if [[ "$(id -u)" -eq 0 ]]; then
   ui_err "Do not run as root. Run as your normal user."
   exit 1
@@ -65,22 +61,18 @@ need tar
 AUTH_HEADER=()
 [[ -n "${GITHUB_TOKEN:-}" ]] && AUTH_HEADER=(-H "Authorization: Bearer $GITHUB_TOKEN")
 
-# --- Paths
 XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 
-# Lutris
 LUTRIS_NATIVE_CFG="$HOME/.config/lutris"
 LUTRIS_NATIVE_RUNNERS="$XDG_DATA_HOME/lutris/runners/wine"
 LUTRIS_FLATPAK_CFG="$HOME/.var/app/net.lutris.Lutris/config/lutris"
 LUTRIS_FLATPAK_RUNNERS="$HOME/.var/app/net.lutris.Lutris/data/lutris/runners/wine"
 
-# Heroic
 HEROIC_NATIVE_CFG="$HOME/.config/heroic"
 HEROIC_FLATPAK_CFG="$HOME/.var/app/com.heroicgameslauncher.hgl/config/heroic"
 HEROIC_NATIVE_TOOLS="$HEROIC_NATIVE_CFG/tools/wine"
 HEROIC_FLATPAK_TOOLS="$HEROIC_FLATPAK_CFG/tools/wine"
 
-# Bottles (Flatpak)
 BOTTLES_FLATPAK_CFG="$HOME/.var/app/com.usebottles.bottles/config"
 BOTTLES_FLATPAK_RUNNERS="$HOME/.var/app/com.usebottles.bottles/data/bottles/runners"
 
@@ -104,7 +96,6 @@ if [[ -d "$LUTRIS_FLATPAK_CFG" || -d "$LUTRIS_FLATPAK_RUNNERS" ]]; then
   add_target "$LUTRIS_FLATPAK_RUNNERS" "Lutris (Flatpak)"
 fi
 
-# Heroic
 if [[ -d "$HEROIC_NATIVE_CFG" ]]; then
   add_target "$HEROIC_NATIVE_TOOLS" "Heroic (native)"
 fi
@@ -112,7 +103,6 @@ if [[ -d "$HEROIC_FLATPAK_CFG" ]]; then
   add_target "$HEROIC_FLATPAK_TOOLS" "Heroic (Flatpak)"
 fi
 
-# Bottles (Flatpak)
 if [[ -d "$BOTTLES_FLATPAK_CFG" || -d "$BOTTLES_FLATPAK_RUNNERS" ]]; then
   add_target "$BOTTLES_FLATPAK_RUNNERS" "Bottles (Flatpak)"
 fi

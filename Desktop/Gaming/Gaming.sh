@@ -11,9 +11,6 @@ set -euo pipefail
 #
 # Run with sudo: sudo ./gaming-setup.sh
 
-# --- Theme / colors ---------------------------------------------------------
-# Same Nord palette as X-Linuxtool.sh, anchored on Polar Night #2e3440
-# (base/border) and Aurora Red #bf616a (accent/selection).
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
     C_BOLD=$'\033[1m'
@@ -100,7 +97,6 @@ install_utilities() {
   fi
 }
 
-########## Extra installers (Wine TkG + Proton CachyOS) ##########
 # These scripts live in the repo's Gaming/ folder. Codeberg is primary, GitHub is fallback.
 CODEBERG_RAW_BASE="https://codeberg.org/X27/X-Linuxtool/raw/branch/main/Desktop/Gaming"
 GITHUB_RAW_BASE="https://raw.githubusercontent.com/GamerX27/X-Linuxtool/main/Desktop/Gaming"
@@ -158,11 +154,9 @@ run_extra_installers() {
   done
 }
 
-########## Debian / Ubuntu family ##########
 install_debian_like() {
   ui_step "Debian/Ubuntu family detected."
 
-  # Enable i386 for Steam/Wine 32-bit libs
   if ! dpkg --print-foreign-architectures | grep -q '^i386$'; then
     ui_info "Enabling i386 multiarch…"
     dpkg --add-architecture i386
@@ -197,7 +191,6 @@ install_debian_like() {
   flatpak install -y flathub com.discordapp.Discord
 }
 
-########## Fedora / RHEL family ##########
 enable_rpmfusion_fedora() {
   if dnf repolist | grep -Eq 'rpmfusion-free|rpmfusion-nonfree'; then
     ui_warn "RPM Fusion repositories already enabled. Skipping."
@@ -242,7 +235,6 @@ install_fedora_like() {
   flatpak install -y flathub com.discordapp.Discord
 }
 
-########## Arch / Manjaro / EndeavourOS ##########
 enable_arch_multilib() {
   if ! grep -Eq '^\[multilib\]' /etc/pacman.conf; then
     if grep -Eq '^\s*#\s*\[multilib\]' /etc/pacman.conf; then
@@ -295,7 +287,6 @@ install_arch_like() {
   flatpak install -y flathub com.discordapp.Discord
 }
 
-########## Entry point ##########
 main() {
   require_root
   [ -r /etc/os-release ] || { ui_err "Cannot detect distro (no /etc/os-release)."; exit 1; }

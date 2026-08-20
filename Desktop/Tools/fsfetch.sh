@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# --- Theme / colors ---------------------------------------------------------
-# Same Nord palette as X-Linuxtool.sh, anchored on Polar Night #2e3440
-# (base/border) and Aurora Red #bf616a (accent/selection).
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
     C_BOLD=$'\033[1m'
@@ -43,20 +40,15 @@ ui_err()     { printf '%s  ✖%s %s\n'   "$C_RED"    "$C_RESET" "$1" >&2; }
 ui_step()    { printf '\n%s  ➤ %s%s\n' "$C_MAGENTA$C_BOLD" "$1" "$C_RESET"; }
 ui_rule()    { printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM$C_GREY" "$C_RESET"; }
 
-# Function to detect current user
 detect_user() {
-    # Try to get the actual user who ran sudo
     if [ -n "$SUDO_USER" ]; then
-        # If running with sudo, use the original user
         USER_HOME=$(eval echo ~$SUDO_USER)
         CURRENT_USER="$SUDO_USER"
     else
-        # If running as regular user, use current user
         CURRENT_USER=$(whoami)
         USER_HOME=$(eval echo ~$CURRENT_USER)
     fi
-    
-    # Validate that we have a valid home directory
+
     if [ -z "$USER_HOME" ] || [ ! -d "$USER_HOME" ]; then
         ui_err "Could not determine user home directory"
         exit 1
@@ -65,20 +57,14 @@ detect_user() {
     ui_info "Using user: $CURRENT_USER with home directory: $USER_HOME"
 }
 
-# Detect current user
 detect_user
 
-# Navigate to .config directory and create fastfetch folder if it doesn't exist
 mkdir -p "$USER_HOME/.config/fastfetch" || { ui_err "Could not navigate or create directory"; exit 1; }
 
-# Generate default configuration in fastfetch directory
 fastfetch --gen-config "$USER_HOME/.config/fastfetch/config.jsonc" || { ui_err "Could not generate default config"; exit 1; }
 
-# Remove the generated default config file if it exists
 rm -f "$USER_HOME/.config/fastfetch/config.jsonc"
 
-# Download updated config from GitHub
 wget https://raw.githubusercontent.com/harilvfs/fastfetch/refs/heads/old-days/fastfetch/config.jsonc -O "$USER_HOME/.config/fastfetch/config.jsonc" || { ui_err "Could not download config file"; exit 1; }
 
-# Notify the user to close and reopen terminal
 ui_ok "Close your terminal and reopen it to see the changes."

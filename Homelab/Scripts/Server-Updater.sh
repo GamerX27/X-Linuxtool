@@ -20,14 +20,10 @@ CRON_DOW="*"
 SCHEDULE_DESC=""
 AUTO_REBOOT="0"
 
-# ---------------------------------------------------------------------------
-# Styling — Nord palette (same as X-Linuxtool.sh / GamingTools.sh), anchored
-# on Polar Night #2e3440 (base) and Aurora Red #bf616a (accent/error).
-# Applies only to this setup wizard's own output; the os_update.sh, the
+# Colors apply only to this setup wizard's own output; the os_update.sh, the
 # update-system wrapper, the Gotify conf, and the cron file it installs are
 # literal file content and are left uncolored (os_update.sh runs
 # non-interactively via cron and its output is logged to a plain text file).
-# ---------------------------------------------------------------------------
 if [[ -t 1 ]] && [[ "${TERM:-dumb}" != "dumb" ]] && [[ -z "${NO_COLOR:-}" ]]; then
   C_RESET=$'\e[0m'; C_BOLD=$'\e[1m'; C_DIM=$'\e[2m'
   case "${TERM:-}" in
@@ -95,14 +91,12 @@ install_updater_script() {
   local target="/usr/local/sbin/os_update.sh"
   cat > "$target" <<"EOF"
 #!/usr/bin/env bash
-# /usr/local/sbin/os_update.sh
 # Cross-distro, non-interactive system updater with logging, dry-run, and optional Gotify notifications.
 
 set -euo pipefail
 
 LOGFILE="/var/log/os_update.log"
 
-# Load optional Gotify configuration
 GOTIFY_CONF="/etc/os_update_gotify.conf"
 if [[ -r "$GOTIFY_CONF" ]]; then
   # shellcheck disable=SC1091
@@ -129,7 +123,6 @@ done
 
 echo "===== $(date -Is) : Starting system update (dry-run=$DRY_RUN) ====="
 
-# Prefer /etc/os-release
 if [[ -r /etc/os-release ]]; then
   # shellcheck disable=SC1091
   . /etc/os-release || true
@@ -137,11 +130,9 @@ fi
 
 is_cmd() { command -v "$1" >/dev/null 2>&1; }
 
-# Gotify notification helper
 gotify_notify() {
   local exit_code="$1"
 
-  # Do nothing if Gotify is not configured/enabled
   if [[ "$GOTIFY_ENABLED" != "1" ]]; then
     return 0
   fi
@@ -263,7 +254,6 @@ update_rhel() {
   fi
 }
 
-# Detect family
 if [[ "${ID_LIKE:-}" =~ debian ]] || [[ "${ID:-}" =~ (debian|ubuntu|linuxmint|pop) ]]; then
   family="debian"
 elif [[ "${ID_LIKE:-}" =~ (rhel|fedora) ]] || [[ "${ID:-}" =~ (rhel|centos|rocky|almalinux|ol|fedora|oracle) ]]; then
@@ -319,7 +309,6 @@ configure_gotify() {
     return 0
   fi
 
-  # Ensure curl exists before allowing configuration
   if ! command -v curl >/dev/null 2>&1; then
     ui_warn "curl is required for Gotify notifications but is not installed."
     read -r -p "$(ui_prompt "Install curl now? [y/N] ")" CURL_ANS || true
@@ -485,18 +474,16 @@ install_cron() {
   local crondir="/etc/cron.d"
   local cronfile="$crondir/os_auto_update"
 
-  # Ensure cron.d directory exists
   if [[ ! -d "$crondir" ]]; then
     ui_info "Creating $crondir..."
     mkdir -p "$crondir"
     chmod 755 "$crondir"
   fi
 
-  # Ensure log file exists and is writable
   touch /var/log/os_update.log
   chmod 0644 /var/log/os_update.log
 
-  # Export AUTO_REBOOT in the cron environment
+  # Export AUTO_REBOOT in the cron environment (cron jobs don't inherit shell env)
   cat > "$cronfile" <<EOF
 # Auto system updates (managed by setup-auto-updates.sh)
 SHELL=/bin/bash
@@ -538,7 +525,7 @@ main() {
   reset_existing_installation
   install_updater_script
   install_update_command
-  configure_gotify     # optional, checks curl if enabling Gotify
+  configure_gotify
   read_schedule
   install_cron
   systemctl restart cron 2>/dev/null || systemctl restart crond 2>/dev/null || true

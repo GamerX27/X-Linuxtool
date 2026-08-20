@@ -6,9 +6,6 @@
 
 set -euo pipefail
 
-# --- Theme / colors ---------------------------------------------------------
-# Same Nord palette as X-Linuxtool.sh, anchored on Polar Night #2e3440
-# (base/border) and Aurora Red #bf616a (accent/selection).
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
     C_BOLD=$'\033[1m'
@@ -103,7 +100,6 @@ install_packages() {
 configure_default_network() {
   ui_info "Configuring default libvirt NAT network..."
 
-  # Debian/Ubuntu-specific fix: disable system dnsmasq to avoid conflicts
   if [[ "$PKG_MGR" == "apt" ]]; then
     ui_info "Applying Debian/Ubuntu dnsmasq fix..."
     systemctl stop dnsmasq || true
@@ -159,7 +155,6 @@ enable_libvirt_service() {
   ui_ok "libvirtd is enabled."
 }
 
-### main
 if [[ $EUID -ne 0 ]]; then
   ui_err "Run as root (sudo)."; exit 1
 fi

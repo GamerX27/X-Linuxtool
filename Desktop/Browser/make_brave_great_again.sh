@@ -1,13 +1,7 @@
 #!/bin/bash
-# make_brave_great_again.sh
-# Disable unwanted Brave features via managed policy
-# The name has nothing to do with politics even if it sounds like it...
 # It may say in the privacy settings the mic and camera are still on, but they are blocked from being accessed.
 set -e
 
-# --- Theme / colors ---------------------------------------------------------
-# Same Nord palette as X-Linuxtool.sh, anchored on Polar Night #2e3440
-# (base/border) and Aurora Red #bf616a (accent/selection).
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
     C_BOLD=$'\033[1m'
@@ -48,7 +42,6 @@ ui_err()     { printf '%s  ✖%s %s\n'   "$C_RED"    "$C_RESET" "$1" >&2; }
 ui_step()    { printf '\n%s  ➤ %s%s\n' "$C_MAGENTA$C_BOLD" "$1" "$C_RESET"; }
 ui_rule()    { printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM$C_GREY" "$C_RESET"; }
 
-# ---- Detect Brave Flatpak & scope (system/user) ----
 has_brave_flatpak() {
   command -v flatpak >/dev/null 2>&1 && flatpak info com.brave.Browser >/dev/null 2>&1
 }
@@ -56,9 +49,7 @@ brave_flatpak_scope() {
   # returns "system" or "user"
   flatpak info com.brave.Browser 2>/dev/null | awk -F': *' '/^Installation:/ {print tolower($2)}'
 }
-# ----------------------------------------------------
 
-# Create the policies dir and write the policy file
 sudo mkdir -p /etc/brave/policies/managed
 
 sudo tee /etc/brave/policies/managed/make_brave_great_again.json >/dev/null <<'JSON'
@@ -120,7 +111,6 @@ JSON
 
 ui_ok "Brave policies written: /etc/brave/policies/managed/make_brave_great_again.json"
 
-# If Brave is the Flatpak, grant it read-only access to the policies dir
 if has_brave_flatpak; then
   scope="$(brave_flatpak_scope)"
   if [ "$scope" = "system" ]; then
@@ -135,7 +125,6 @@ else
   ui_warn "Brave Flatpak not detected — no Flatpak override needed."
 fi
 
-# ---- Add Brave telemetry domains to /etc/hosts ----
 ui_step "Adding Brave telemetry domains to /etc/hosts"
 ui_info " - variations.brave.com"
 ui_info " - safebrowsing.brave.com"
@@ -164,7 +153,6 @@ if ! grep -q "analytics.brave.com" /etc/hosts; then
 else
   ui_warn "analytics.brave.com already exists in /etc/hosts. Skipping."
 fi
-# ---------------------------------------------------
 
 
 ui_ok "All done."

@@ -1,26 +1,5 @@
 #!/usr/bin/env bash
 #
-# Fedora-PostSetup.sh
-# Post-installation setup helper for Fedora.
-#
-# Steps performed:
-#   1. Refresh metadata and apply all available updates.
-#   2. Enable the RPM Fusion (free + nonfree) repositories.
-#   3. Enable the Cisco OpenH264 repository for hardware/codec support.
-#   4. Update the @core package group.
-#   5. Install the full multimedia / codec stack.
-#   6. Install hardware-accelerated video codecs (Intel or AMD).
-#   7. Remove unwanted default apps and install base packages.
-#   8. Set up Flatpaks (Flathub remote, app list, Vivaldi).
-#   9. Disable the NetworkManager connectivity check.
-#  10. Install and configure the Brave browser.
-#  11. Optionally run the gaming setup script.
-#  12. Set LC_TIME locale to C.UTF-8.
-#  13. Optionally install the Zed editor.
-#  14. Clean up orphaned packages and optionally reboot.
-#
-# Usage: ./Fedora-PostSetup.sh
-#
 # Run this as your normal user (NOT with sudo). You will be asked for your
 # password once; system steps (including the system-wide Flatpak installs) then
 # use that cached sudo session, while per-user steps (e.g. Zed) run as you
@@ -28,13 +7,9 @@
 #
 # The script is idempotent: it can be re-run safely without aborting on
 # already-installed packages or already-configured repositories.
-#
 
 set -uo pipefail
 
-# --- Theme / colors ---------------------------------------------------------
-# Same Nord palette as X-Linuxtool.sh, anchored on Polar Night #2e3440
-# (base/border) and Aurora Red #bf616a (accent/selection).
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
     C_BOLD=$'\033[1m'
@@ -67,8 +42,6 @@ else
     C_RESET="" C_BOLD="" C_DIM=""
     C_GREY="" C_FG="" C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_MAGENTA="" C_ACCENT=""
 fi
-
-# --- Helpers ----------------------------------------------------------------
 
 log() {
     printf '\n%s==>%s %s%s%s\n' "$C_BLUE$C_BOLD" "$C_RESET" "$C_BOLD" "$1" "$C_RESET"
@@ -111,7 +84,6 @@ _download() {
 
 fetch_repo_file() {
     # fetch_repo_file <relative/path> <output-file>
-    # Downloads from Codeberg (primary); falls back to the GitHub mirror.
     local rel="$1" out="$2"
 
     log "Fetching ${rel} from Codeberg"
@@ -145,8 +117,6 @@ set_locale_time() {
         || warn "Failed to set LC_TIME (continuing)."
 }
 
-# --- Pre-flight checks ------------------------------------------------------
-
 if [[ "${EUID}" -eq 0 ]]; then
     err "Do not run this script with sudo or as root. Run it as your normal user; it will request sudo itself."
     exit 1
@@ -174,42 +144,29 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Detect the Fedora release version (e.g. 40, 41, ...).
 FEDORA_VERSION="$(rpm -E %fedora)"
 log "Detected Fedora ${FEDORA_VERSION}"
-
-# --- 1. Refresh and upgrade -------------------------------------------------
 
 log "Refreshing metadata and upgrading the system"
 sudo dnf update --refresh -y
 sudo dnf upgrade -y
-
-# --- 2. Enable RPM Fusion (free + nonfree) ----------------------------------
 
 log "Enabling RPM Fusion (free + nonfree) repositories"
 sudo dnf install -y \
     "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${FEDORA_VERSION}.noarch.rpm" \
     "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FEDORA_VERSION}.noarch.rpm"
 
-# --- 3. Enable Cisco OpenH264 -----------------------------------------------
-
 log "Enabling the Cisco OpenH264 repository"
 sudo dnf config-manager setopt fedora-cisco-openh264.enabled=1
 
-# --- 4. Update @core --------------------------------------------------------
-
 log "Updating the @core package group"
 sudo dnf update -y @core
-
-# --- 5. Multimedia ----------------------------------------------------------
 
 log "Switching to the full ffmpeg build"
 sudo dnf swap ffmpeg-free ffmpeg --allowerasing -y
 
 log "Installing additional multimedia codecs"
 sudo dnf update -y @multimedia --setopt="install_weak_deps=False" --exclude=PackageKit-gstreamer-plugin
-
-# --- 6. Hardware-accelerated codecs -----------------------------------------
 
 log "Hardware-accelerated video codecs"
 printf '%sSelect your GPU vendor for hardware-accelerated (VA-API) codecs:%s\n' "$C_FG" "$C_RESET"
@@ -237,8 +194,6 @@ case "${gpu_choice}" in
         ;;
 esac
 
-# --- 7. Base packages -------------------------------------------------------
-
 log "Removing unwanted default applications"
 sudo dnf remove -y \
     dragon juk elisa-player kmail khelpcenter kmahjongg kmines kpat firefox \
@@ -250,8 +205,6 @@ sudo dnf install -y wget fastfetch fish htop nano papirus-icon-theme curl pciuti
 
 log "Installing base applications"
 sudo dnf install -y vlc nextcloud-client easyeffects gnome-disk-utility libreoffice-writer gwenview
-
-# --- 8. Flatpaks ------------------------------------------------------------
 
 require_cmd flatpak
 
@@ -275,8 +228,6 @@ sudo flatpak remote-modify fedora-testing --disable
 log "Installing Vivaldi (Flatpak)"
 sudo flatpak install -y flathub com.vivaldi.Vivaldi
 
-# --- 9. Disable NetworkManager connectivity check ---------------------------
-
 log "Disabling the NetworkManager connectivity check"
 # An empty connectivity URI disables the check. We write the override to /etc
 # (the proper override location) so it persists across updates and survives the
@@ -292,8 +243,6 @@ sudo systemctl restart NetworkManager
 
 log "Waiting 10 seconds for NetworkManager to settle"
 sleep 10
-
-# --- 10. Browser configuration ----------------------------------------------
 
 log "Installing the Brave browser (origin flavor)"
 curl -fsS https://dl.brave.com/install.sh | FLAVOR=origin sh
@@ -312,8 +261,6 @@ sudo dnf install -y librewolf
 log "Installing additional browsers (Chromium, Tor Browser Launcher)"
 sudo dnf install -y chromium torbrowser-launcher
 
-# --- 11. Gaming (optional) --------------------------------------------------
-
 log "Gaming setup"
 if ask_yes_no "Would you like to run the gaming setup script?"; then
     log "Running the gaming setup script"
@@ -325,11 +272,7 @@ else
     log "Skipping gaming setup"
 fi
 
-# --- 12. Locale -------------------------------------------------------------
-
 set_locale_time
-
-# --- 13. Zed editor (optional) ----------------------------------------------
 
 log "Zed editor"
 if ask_yes_no "Would you like to install the Zed editor?"; then
@@ -338,8 +281,6 @@ if ask_yes_no "Would you like to install the Zed editor?"; then
 else
     log "Skipping Zed editor installation"
 fi
-
-# --- 14. Cleanup and reboot -------------------------------------------------
 
 log "Removing orphaned packages"
 sudo dnf autoremove -y

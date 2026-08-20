@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# --- Theme / colors ---------------------------------------------------------
-# Same Nord palette as X-Linuxtool.sh, anchored on Polar Night #2e3440
-# (base/border) and Aurora Red #bf616a (accent/selection).
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
     C_BOLD=$'\033[1m'
@@ -51,7 +48,6 @@ ui_menu_item() {
         "$C_GREY$C_DIM" "$3" "$C_RESET"
 }
 
-# --- Repository locations ---------------------------------------------------
 # Codeberg is the primary source; GitHub is a mirror used as a fallback when
 # Codeberg cannot be reached.
 CODEBERG_RAW="https://codeberg.org/X27/X-Linuxtool/raw/branch/main/Desktop"
@@ -71,7 +67,6 @@ _download() {
 
 fetch_repo_file() {
     # fetch_repo_file <relative/path> <output-file>
-    # Downloads from Codeberg (primary); falls back to the GitHub mirror.
     local rel="$1" out="$2"
 
     ui_info "Fetching ${rel} from Codeberg…"

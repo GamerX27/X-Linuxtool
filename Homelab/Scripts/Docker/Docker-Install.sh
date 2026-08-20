@@ -1,29 +1,7 @@
 #!/usr/bin/env bash
-# Docker-Install.sh
-# Installs Docker CE from Docker's official repository on:
-#   - RHEL/Fedora family (rhel, centos, rocky, almalinux, ol/oracle, fedora)
-#   - Debian/Ubuntu family (debian, ubuntu, linuxmint, pop)
-# Behavior:
-#   - Detects and removes Docker packages installed from the distro's own repos
-#   - Sets up the official Docker repository and installs the latest Docker CE
-#   - Enables and starts the docker service
-#   - Adds the invoking (non-root) user to the "docker" group so they can run
-#     docker commands without sudo
-#
-# Usage:
-#   sudo bash Docker-Install.sh [--user NAME]
-#
-# Target-user detection (for the docker group add) does NOT rely solely on
-# $SUDO_USER, because this script is commonly invoked from another script
-# that is already running as root (e.g. via X27-Homelab.sh), and a nested
-# `sudo` call made *by root* resets SUDO_USER to "root" rather than the
-# original login user. See detect_target_user() below.
 
 set -euo pipefail
 
-# --- Theme / colors ---------------------------------------------------------
-# Same Nord palette as X-Linuxtool.sh, anchored on Polar Night #2e3440
-# (base/border) and Aurora Red #bf616a (accent/selection).
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
     C_BOLD=$'\033[1m'
@@ -64,63 +42,17 @@ ui_err()     { printf '%s  ✖%s %s\n'   "$C_RED"    "$C_RESET" "$1" >&2; }
 ui_step()    { printf '\n%s  ➤ %s%s\n' "$C_MAGENTA$C_BOLD" "$1" "$C_RESET"; }
 ui_rule()    { printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM$C_GREY" "$C_RESET"; }
 
-# The user who should be added to the docker group. Resolved by
-# detect_target_user() below (called from main, after arg parsing).
 TARGET_USER=""
-CLI_TARGET_USER=""
 
 is_cmd() { command -v "$1" >/dev/null 2>&1; }
 
-parse_args() {
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      -u|--user)
-        [[ $# -ge 2 ]] || { ui_err "Missing value for $1"; exit 1; }
-        CLI_TARGET_USER="$2"
-        shift 2
-        ;;
-      --user=*)
-        CLI_TARGET_USER="${1#*=}"
-        shift
-        ;;
-      -h|--help)
-        printf 'Usage: sudo bash %s [--user NAME]\n' "$(basename "$0")"
-        printf '  --user NAME   Add NAME to the docker group instead of auto-detecting it.\n'
-        exit 0
-        ;;
-      *)
-        # Accept a bare positional username too, for convenience.
-        CLI_TARGET_USER="$1"
-        shift
-        ;;
-    esac
-  done
-}
-
-# Determine the non-root user that should be added to the docker group.
-#
-# SUDO_USER alone is not reliable: when this script is invoked via a nested
-# `sudo` call made by a process that is already root (e.g. X27-Homelab.sh,
-# itself launched with sudo, doing `sudo bash Docker-Install.sh`), sudo sets
-# SUDO_USER to the user who ran *that* sudo command - which is root - so the
-# original login name is lost. The kernel's login uid (surfaced via
-# /proc/self/loginuid, the same mechanism `logname` uses) is set once at
-# login and survives any number of nested su/sudo calls, so it's used as the
-# primary source of truth here.
-#
-# Preference order:
-#   1. --user/-u flag, if explicitly given
-#   2. Kernel login uid (robust across nested sudo)
-#   3. `logname` (falls back to the same mechanism)
-#   4. SUDO_USER, if set and not root
-#   5. PKEXEC_UID, for polkit-based invocations
-#   6. $USER, if not root
+# SUDO_USER alone is unreliable here: this script is often invoked via a
+# nested `sudo` call made by a process that is already root (e.g.
+# X27-Homelab.sh), which resets SUDO_USER to "root" instead of the real
+# login user. /proc/self/loginuid survives nested su/sudo, so it's tried
+# first.
 detect_target_user() {
   local candidate=""
-
-  if [[ -n "$CLI_TARGET_USER" ]]; then
-    candidate="$CLI_TARGET_USER"
-  fi
 
   if [[ -z "$candidate" ]]; then
     local login_uid
@@ -149,7 +81,6 @@ detect_target_user() {
     candidate="$USER"
   fi
 
-  # Validate the candidate actually exists as a user.
   if [[ -n "$candidate" ]] && ! getent passwd "$candidate" >/dev/null 2>&1; then
     ui_warn "Detected user '$candidate' does not exist on this system; ignoring."
     candidate=""
@@ -166,7 +97,6 @@ require_root() {
 }
 
 detect_family() {
-  # Prefer /etc/os-release
   if [[ -r /etc/os-release ]]; then
     # shellcheck disable=SC1091
     . /etc/os-release || true
@@ -192,10 +122,6 @@ detect_family() {
 
   ui_info "Detected distro: ${PRETTY_NAME:-${ID:-unknown}} (family: $FAMILY)"
 }
-
-# ----------------------------------------------------------------------------
-# Removal of distro-provided / old Docker packages
-# ----------------------------------------------------------------------------
 
 remove_old_docker_debian() {
   ui_info "Checking for existing (distro-provided) Docker packages..."
@@ -263,10 +189,6 @@ remove_old_docker_rhel() {
     ui_info "No conflicting distro-provided Docker packages found."
   fi
 }
-
-# ----------------------------------------------------------------------------
-# Installation from Docker's official repository
-# ----------------------------------------------------------------------------
 
 install_docker_debian() {
   export DEBIAN_FRONTEND=noninteractive
@@ -359,10 +281,6 @@ install_docker_rhel() {
   ui_ok "Docker CE installed."
 }
 
-# ----------------------------------------------------------------------------
-# Service + user group setup
-# ----------------------------------------------------------------------------
-
 enable_service() {
   ui_info "Enabling and starting the docker service..."
   if is_cmd systemctl; then
@@ -391,8 +309,6 @@ add_user_to_docker_group() {
     if [[ -z "$TARGET_USER" || "$TARGET_USER" == "root" ]]; then
       printf '%s       Add a user manually with:%s\n' "$C_GREY$C_DIM" "$C_RESET"
       printf '%s         sudo usermod -aG docker <username>%s\n' "$C_GREY$C_DIM" "$C_RESET"
-      printf '%s       Or re-run with:%s\n' "$C_GREY$C_DIM" "$C_RESET"
-      printf '%s         sudo bash %s --user <username>%s\n' "$C_GREY$C_DIM" "$(basename "$0")" "$C_RESET"
       return 0
     fi
   fi
@@ -419,7 +335,6 @@ verify_install() {
 }
 
 main() {
-  parse_args "$@"
   require_root
   detect_target_user
   detect_family

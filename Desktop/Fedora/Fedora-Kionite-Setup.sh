@@ -1,21 +1,12 @@
 #!/bin/bash
 
-# =============================================
-# INITIAL CHECKS AND FUNCTIONS
-# =============================================
-
-# Check if the script is being run with sudo privileges
 if [[ $EUID -ne 0 ]]; then
    echo "This script must be run as root (use sudo)."
    exit 1
 fi
 
-# Handle Ctrl+C interruption
 trap 'echo -e "\nProcess interrupted. Exiting."; exit 1' SIGINT SIGTERM
 
-# --- Theme / colors ---------------------------------------------------------
-# Same Nord palette as X-Linuxtool.sh, anchored on Polar Night #2e3440
-# (base/border) and Aurora Red #bf616a (accent/selection).
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
     C_BOLD=$'\033[1m'
@@ -49,7 +40,6 @@ else
     C_GREY="" C_FG="" C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_MAGENTA="" C_ACCENT=""
 fi
 
-# Logging functions
 info() { printf '%s[INFO]%s %s\n' "$C_BLUE$C_BOLD" "$C_RESET" "$1"; }
 ok()   { printf '%s  ✔%s %s\n' "$C_GREEN" "$C_RESET" "$1"; }
 warn() { printf '%s[WARN]%s %s\n' "$C_YELLOW$C_BOLD" "$C_RESET" "$1" >&2; }
@@ -83,7 +73,6 @@ _download() {
 
 fetch_repo_file() {
     # fetch_repo_file <relative/path> <output-file>
-    # Downloads from Codeberg (primary); falls back to the GitHub mirror.
     local rel="$1" out="$2"
 
     info "Fetching ${rel} from Codeberg..."
@@ -100,17 +89,11 @@ fetch_repo_file() {
     return 1
 }
 
-# =============================================
-# FLATPAK SETUP
-# =============================================
-
-# Configure Flatpak remotes
 info "Configuring Flatpak remotes..."
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 flatpak remote-modify --disable fedora-testing 2>/dev/null || warn "Failed to disable fedora-testing remote (may not exist)."
 flatpak remote-modify --disable fedora 2>/dev/null || warn "Failed to disable fedora remote (may not exist)."
 
-# Apps to remove and install
 APPS_TO_REMOVE=(
     org.kde.elisa
     org.kde.kmahjongg
@@ -127,7 +110,6 @@ APPS_TO_INSTALL=(
     com.unicornsonlsd.finamp
 )
 
-# Clean up default KDE apps
 info "Cleaning up default KDE apps..."
 for app in "${APPS_TO_REMOVE[@]}"; do
     if flatpak list --app | grep -q "$app"; then
@@ -135,15 +117,10 @@ for app in "${APPS_TO_REMOVE[@]}"; do
     fi
 done
 
-# Install core Flatpaks
 info "Installing core Flatpaks..."
 for app in "${APPS_TO_INSTALL[@]}"; do
     try "Installing $app" flatpak install --assumeyes flathub "$app"
 done
-
-# =============================================
-# BRAVE BROWSER DEBLOAT
-# =============================================
 
 info "Debloating Brave Browser..."
 fetch_repo_file "Browser/make_brave_great_again.sh" /tmp/make_brave_great_again.sh
@@ -155,16 +132,10 @@ else
 fi
 rm -f /tmp/make_brave_great_again.sh
 
-# =============================================
-# SYSTEM UPDATES AND CONFIGURATION
-# =============================================
-
-# Update Flatpaks
 info "Running initial Flatpak update..."
 flatpak update --noninteractive
 flatpak --system update --noninteractive 2>/dev/null || warn "Failed to update system Flatpaks (may not be applicable)."
 
-# Disable NetworkManager connectivity check
 info "Disabling NetworkManager connectivity check..."
 NM_DIR_ETC="/etc/NetworkManager/conf.d"
 NM_FILE_ETC="${NM_DIR_ETC}/20-connectivity-fedora.conf"
@@ -175,7 +146,6 @@ fi
 printf '[connectivity]\nenabled=false\n' > "$NM_FILE_ETC"
 systemctl restart NetworkManager
 
-# Configure rpm-ostree automatic updates
 info "Configuring rpm-ostree automatic updates..."
 cat <<EOF > /etc/rpm-ostreed.conf
 [Daemon]
@@ -184,11 +154,9 @@ EOF
 systemctl reload rpm-ostreed 2>/dev/null || warn "rpm-ostreed service not active (will be enabled next)."
 systemctl enable --now rpm-ostreed-automatic.timer
 
-# Perform final system upgrade
 info "Performing final system upgrade..."
 rpm-ostree upgrade --allow-downgrade
 
-# Set locale time
 set_locale_time() {
     info "Attempting to set LC_TIME to C.UTF-8..."
     if localectl list-locales | grep -q "C.UTF-8"; then
@@ -203,10 +171,6 @@ set_locale_time() {
     fi
 }
 set_locale_time
-
-# =============================================
-# FLATPAK AUTO-UPDATE SETUP
-# =============================================
 
 info "Setting up Flatpak autostart for updates..."
 fetch_repo_file "Flatpak/Flatpak-AutoUpdate-Setup.sh" Flatpak-AutoUpdate-Setup.sh

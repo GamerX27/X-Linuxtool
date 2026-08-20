@@ -2,9 +2,6 @@
 #source: https://pliszko.com/blog/post/2025-07-31-fixing-instant-wake-from-suspend-on-gigabyte-motherboards-on-arch-linux
 #!/bin/bash
 
-# --- Theme / colors ---------------------------------------------------------
-# Same Nord palette as X-Linuxtool.sh, anchored on Polar Night #2e3440
-# (base/border) and Aurora Red #bf616a (accent/selection).
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
     C_BOLD=$'\033[1m'
@@ -45,9 +42,6 @@ ui_err()     { printf '%s  ✖%s %s\n'   "$C_RED"    "$C_RESET" "$1" >&2; }
 ui_step()    { printf '\n%s  ➤ %s%s\n' "$C_MAGENTA$C_BOLD" "$1" "$C_RESET"; }
 ui_rule()    { printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM$C_GREY" "$C_RESET"; }
 
-# Script to permanently fix GPP0 wakeup issue
-
-# Step 1: Create a systemd service for a permanent fix
 ui_info "Creating systemd service to disable GPP0 on boot..."
 sudo bash -c 'cat > /etc/systemd/system/wakeup-disable-GPP0.service <<EOF
 [Unit]
@@ -62,7 +56,6 @@ ExecStart=/bin/bash -c "echo GPP0 > /proc/acpi/wakeup"
 WantedBy=multi-user.target
 EOF'
 
-# Step 2: Enable the service
 ui_info "Enabling the service..."
 sudo systemctl enable wakeup-disable-GPP0.service
 

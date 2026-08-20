@@ -2,9 +2,6 @@
 # Source https://github.com/CachyOS/proton-cachyos
 set -euo pipefail
 
-# --- Theme / colors ---------------------------------------------------------
-# Same Nord palette as X-Linuxtool.sh, anchored on Polar Night #2e3440
-# (base/border) and Aurora Red #bf616a (accent/selection).
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
     C_BOLD=$'\033[1m'
@@ -48,7 +45,6 @@ ui_rule()    { printf '%s──────────────────�
 REPO="CachyOS/proton-cachyos"
 API_URL="https://api.github.com/repos/${REPO}/releases/latest"
 
-# --- don't run as root (but gracefully drop sudo if used)
 if [[ "$(id -u)" -eq 0 ]]; then
   if [[ -n "${SUDO_USER:-}" ]]; then
     ui_info "Detected sudo; re-running as ${SUDO_USER} without root..."
@@ -92,7 +88,6 @@ trap 'rm -rf "$TMP"' EXIT
 ui_step "Querying latest release..."
 JSON="$(curl -fsSL "${AUTH_HEADER[@]}" "$API_URL")"
 
-# Parse latest asset with the specific pattern
 if command -v jq >/dev/null 2>&1; then
   TAG="$(echo "$JSON" | jq -r '.tag_name // empty')"
   ASSET_URL="$(echo "$JSON" | jq -r '[.assets[] | select(.name|test("slr-x86_64_v3\\.tar\\.xz$"))][0].browser_download_url // empty')"
@@ -157,7 +152,7 @@ find "$COMPAT_DIR" -mindepth 1 -maxdepth 1 -type d -iname 'proton-cachyos-*' -ex
 ui_info "Installing to $INSTALL_PATH"
 cp -a "$NEW_DIR_SRC" "$INSTALL_PATH"
 
-# --- Overwrite the compatibilitytool.vdf so Steam shows "Proton-CachyOS"
+# Overwrite compatibilitytool.vdf so Steam shows "Proton-CachyOS"
 cat > "$INSTALL_PATH/compatibilitytool.vdf" <<'VDF'
 "compatibilitytools"
 {
@@ -174,7 +169,7 @@ cat > "$INSTALL_PATH/compatibilitytool.vdf" <<'VDF'
 }
 VDF
 
-# --- Symlink for convenience
+# Symlink for convenience
 ln -sfn "$INSTALL_PATH" "$COMPAT_DIR/proton-cachyos"
 
 echo

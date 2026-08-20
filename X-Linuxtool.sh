@@ -1,29 +1,17 @@
 #!/bin/bash
 
-# --- Piped execution support ------------------------------------------------
-# This script is designed to be run directly from the web, e.g.:
-#   curl -fsSL https://raw.githubusercontent.com/GamerX27/X-Linuxtool/refs/heads/main/X-Linuxtool.sh | bash
-#   curl -fsSL https://codeberg.org/X27/X-Linuxtool/raw/branch/main/X-Linuxtool.sh | bash
-#
-# When piped into bash, bash reads THIS script from stdin (the pipe), so we
-# must not redirect the whole script's stdin away from it. Instead, point
-# interactive commands (the menu and any sub-scripts) at the controlling
-# terminal individually via $INPUT. When a terminal isn't available we fall
-# back to the normal stdin.
+# Designed to run via `curl | bash`, which means bash reads THIS script from
+# stdin — so we can't redirect stdin away from it wholesale. Interactive
+# commands (menu + sub-scripts) instead read from $INPUT, which points at
+# the controlling terminal when one exists.
 if [ -r /dev/tty ]; then
     INPUT=/dev/tty
 else
     INPUT=/dev/stdin
 fi
 
-# --- Theme / colors ---------------------------------------------------------
-# Nord palette (https://www.nordtheme.com), anchored on the two colors
-# requested for this tool: Polar Night #2e3440 (base/border) and Aurora Red
-# #bf616a (accent/selection). True-color (24-bit) escapes are used on
-# terminals likely to support them; the Linux virtual console and bare
-# screen/tmux terms fall back to the nearest 256-color approximations.
-# Colors are only enabled when writing to a terminal, so piped/redirected
-# output stays clean.
+# Nord palette (https://www.nordtheme.com). Only enabled on an actual
+# terminal, so piped/redirected output stays clean.
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
     C_BOLD=$'\033[1m'
@@ -70,7 +58,6 @@ else
     BG_ACCENT="" FG_ONACCENT=""
 fi
 
-# --- UI helpers -------------------------------------------------------------
 ui_banner() {
     local width=46
     # Center a plain (ASCII) string inside the box and print it as a row.
@@ -234,14 +221,8 @@ ui_select_menu() {
 trap 'tput cnorm 2>/dev/null' EXIT
 trap 'tput cnorm 2>/dev/null; printf "\n"; exit 130' INT TERM
 
-# --- Repository locations ---------------------------------------------------
 # Codeberg is the primary source; GitHub is a mirror used as a fallback when
 # Codeberg cannot be reached.
-#
-# The Desktop and HomeLab toolboxes used to be separate repos
-# (X27-Linux-Desktop-Toolbox, X27-Homelab-ToolBox); they are now merged into
-# this repo as the Desktop/ and Homelab/ subtrees, so both are fetched from
-# X-Linuxtool itself.
 CB_BASE="https://codeberg.org/X27/X-Linuxtool/raw/branch/main"
 GH_BASE="https://raw.githubusercontent.com/GamerX27/X-Linuxtool/main"
 
@@ -268,7 +249,6 @@ _download() {
 
 fetch_file() {
     # fetch_file <codeberg-url> <github-url> <output-file>
-    # Downloads from Codeberg (primary); falls back to the GitHub mirror.
     local cb="$1" gh="$2" out="$3"
 
     ui_info "Fetching from Codeberg…" >&2
@@ -327,17 +307,11 @@ check_and_install_dependencies() {
     fi
 }
 
-# --- Main -------------------------------------------------------------------
 clear 2>/dev/null
 ui_banner
 
-# Run dependency check before showing choices
 check_and_install_dependencies
 
-# Loop back to this menu after every script finishes, clearing the screen at
-# each transition so a script's output (or the previous menu draw) never
-# lingers behind the next screen — this is what lets you run one tool, land
-# back at the main menu, and pick another without restarting X-Linuxtool.sh.
 while true; do
     clear 2>/dev/null
     ui_banner
@@ -367,8 +341,6 @@ while true; do
         exit 0
     fi
 
-    # Hide the main menu while the chosen script runs, so its output starts
-    # on a clean screen instead of stacking under the menu we just drew.
     clear 2>/dev/null
 
     case $choice in
