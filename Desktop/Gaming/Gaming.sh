@@ -101,6 +101,10 @@ install_utilities() {
 CODEBERG_RAW_BASE="https://codeberg.org/X27/X-Linuxtool/raw/branch/main/Desktop/Gaming"
 GITHUB_RAW_BASE="https://raw.githubusercontent.com/GamerX27/X-Linuxtool/main/Desktop/Gaming"
 
+# When invoked by a local X-Linuxtool.sh clone, X27_LOCAL_ROOT points at
+# the clone root; prefer the scripts already on disk over re-downloading.
+LOCAL_BASE="${X27_LOCAL_ROOT:+$X27_LOCAL_ROOT/Desktop/Gaming}"
+
 ensure_curl() {
   have_cmd curl && return 0
   ui_info "Installing curl (needed for extra installers)…"
@@ -120,6 +124,13 @@ ensure_curl() {
 fetch_script() {
   # fetch_script <script-name> <dest>; tries Codeberg first, then GitHub.
   local name="$1" dest="$2"
+
+  if [ -n "$LOCAL_BASE" ] && [ -f "$LOCAL_BASE/$name" ]; then
+    ui_info "Using local copy: ${name}"
+    cp "$LOCAL_BASE/$name" "$dest"
+    return 0
+  fi
+
   ui_info "Fetching ${name} from Codeberg…"
   if curl -fsSL "${CODEBERG_RAW_BASE}/${name}" -o "$dest"; then
     return 0

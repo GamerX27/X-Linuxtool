@@ -235,6 +235,17 @@ GH_HOMELAB="${GH_BASE}/Homelab"
 CB_YTDLP="https://codeberg.org/X27/YTDLP-Easy-Script/raw/branch/main"
 GH_YTDLP="https://raw.githubusercontent.com/GamerX27/YTDLP-Easy-Script/main"
 
+# When run from a local clone (not `curl | bash`), use the scripts already on
+# disk instead of re-downloading them. Exported so the sub-scripts we spawn
+# below (which run from /tmp and can't find local files via their own path)
+# know where the clone lives too.
+LOCAL_ROOT=""
+if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
+    LOCAL_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    [ -d "$LOCAL_ROOT/Desktop" ] && [ -d "$LOCAL_ROOT/Homelab" ] || LOCAL_ROOT=""
+fi
+export X27_LOCAL_ROOT="$LOCAL_ROOT"
+
 _download() {
     # _download <url> <output-file>
     if command -v curl >/dev/null 2>&1; then
@@ -248,8 +259,14 @@ _download() {
 }
 
 fetch_file() {
-    # fetch_file <codeberg-url> <github-url> <output-file>
-    local cb="$1" gh="$2" out="$3"
+    # fetch_file <codeberg-url> <github-url> <output-file> [local-relative-path]
+    local cb="$1" gh="$2" out="$3" local_rel="$4"
+
+    if [ -n "$LOCAL_ROOT" ] && [ -n "$local_rel" ] && [ -f "$LOCAL_ROOT/$local_rel" ]; then
+        ui_info "Using local copy: ${local_rel}" >&2
+        cp "$LOCAL_ROOT/$local_rel" "$out"
+        return 0
+    fi
 
     ui_info "Fetching from Codeberg…" >&2
     if _download "$cb" "$out"; then
@@ -351,19 +368,19 @@ while true; do
             # themselves as needed (Fedora-PostSetup.sh requests sudo internally
             # for its per-user steps; Fedora-Kionite-Setup.sh and
             # Bazzite-Setup.sh are invoked by Fedora.sh with sudo directly).
-            fetch_file "${CB_TOOLBOX}/Fedora.sh" "${GH_TOOLBOX}/Fedora.sh" /tmp/Fedora.sh || exit 1
+            fetch_file "${CB_TOOLBOX}/Fedora.sh" "${GH_TOOLBOX}/Fedora.sh" /tmp/Fedora.sh "Desktop/Fedora.sh" || exit 1
             bash /tmp/Fedora.sh < "$INPUT"
             rm -f /tmp/Fedora.sh
             ;;
         2)
             ui_step "HomeLab"
-            fetch_file "${CB_HOMELAB}/X27-Homelab.sh" "${GH_HOMELAB}/X27-Homelab.sh" /tmp/X27-Homelab.sh || exit 1
+            fetch_file "${CB_HOMELAB}/X27-Homelab.sh" "${GH_HOMELAB}/X27-Homelab.sh" /tmp/X27-Homelab.sh "Homelab/X27-Homelab.sh" || exit 1
             sudo bash /tmp/X27-Homelab.sh < "$INPUT"
             sudo rm -f /tmp/X27-Homelab.sh
             ;;
         3)
             ui_step "Brave"
-            fetch_file "${CB_TOOLBOX}/Browser/make_brave_great_again.sh" "${GH_TOOLBOX}/Browser/make_brave_great_again.sh" /tmp/make_brave_great_again.sh || exit 1
+            fetch_file "${CB_TOOLBOX}/Browser/make_brave_great_again.sh" "${GH_TOOLBOX}/Browser/make_brave_great_again.sh" /tmp/make_brave_great_again.sh "Desktop/Browser/make_brave_great_again.sh" || exit 1
             sudo bash /tmp/make_brave_great_again.sh < "$INPUT"
             sudo rm -f /tmp/make_brave_great_again.sh
             ;;
@@ -379,37 +396,37 @@ while true; do
             # per-option sub-scripts that each handle privilege escalation
             # themselves as needed (Wine and Proton run as the normal user;
             # Gaming Setup is invoked by GamingTools.sh with sudo directly).
-            fetch_file "${CB_TOOLBOX}/GamingTools.sh" "${GH_TOOLBOX}/GamingTools.sh" /tmp/GamingTools.sh || exit 1
+            fetch_file "${CB_TOOLBOX}/GamingTools.sh" "${GH_TOOLBOX}/GamingTools.sh" /tmp/GamingTools.sh "Desktop/GamingTools.sh" || exit 1
             bash /tmp/GamingTools.sh < "$INPUT"
             rm -f /tmp/GamingTools.sh
             ;;
         6)
             ui_step "Sleep Fix"
-            fetch_file "${CB_TOOLBOX}/Tools/GigabyteSleep-Fix.sh" "${GH_TOOLBOX}/Tools/GigabyteSleep-Fix.sh" /tmp/GigabyteSleep-Fix.sh || exit 1
+            fetch_file "${CB_TOOLBOX}/Tools/GigabyteSleep-Fix.sh" "${GH_TOOLBOX}/Tools/GigabyteSleep-Fix.sh" /tmp/GigabyteSleep-Fix.sh "Desktop/Tools/GigabyteSleep-Fix.sh" || exit 1
             sudo bash /tmp/GigabyteSleep-Fix.sh < "$INPUT"
             sudo rm -f /tmp/GigabyteSleep-Fix.sh
             ;;
         7)
             ui_step "Fastfetch"
-            fetch_file "${CB_TOOLBOX}/Tools/fsfetch.sh" "${GH_TOOLBOX}/Tools/fsfetch.sh" /tmp/fsfetch.sh || exit 1
+            fetch_file "${CB_TOOLBOX}/Tools/fsfetch.sh" "${GH_TOOLBOX}/Tools/fsfetch.sh" /tmp/fsfetch.sh "Desktop/Tools/fsfetch.sh" || exit 1
             bash /tmp/fsfetch.sh < "$INPUT"
             rm -f /tmp/fsfetch.sh
             ;;
         8)
             ui_step "Virtualization"
-            fetch_file "${CB_TOOLBOX}/Tools/Virtualization_Setup.sh" "${GH_TOOLBOX}/Tools/Virtualization_Setup.sh" /tmp/Virtualization_Setup.sh || exit 1
+            fetch_file "${CB_TOOLBOX}/Tools/Virtualization_Setup.sh" "${GH_TOOLBOX}/Tools/Virtualization_Setup.sh" /tmp/Virtualization_Setup.sh "Desktop/Tools/Virtualization_Setup.sh" || exit 1
             sudo bash /tmp/Virtualization_Setup.sh < "$INPUT"
             sudo rm -f /tmp/Virtualization_Setup.sh
             ;;
         9)
             ui_step "Flatpak Apps"
-            fetch_file "${CB_TOOLBOX}/Flatpak/flatpaks.sh" "${GH_TOOLBOX}/Flatpak/flatpaks.sh" /tmp/flatpaks.sh || exit 1
+            fetch_file "${CB_TOOLBOX}/Flatpak/flatpaks.sh" "${GH_TOOLBOX}/Flatpak/flatpaks.sh" /tmp/flatpaks.sh "Desktop/Flatpak/flatpaks.sh" || exit 1
             bash /tmp/flatpaks.sh < "$INPUT"
             rm -f /tmp/flatpaks.sh
             ;;
         10)
             ui_step "Flatpak Updates"
-            fetch_file "${CB_TOOLBOX}/Flatpak/Flatpak-AutoUpdate-Setup.sh" "${GH_TOOLBOX}/Flatpak/Flatpak-AutoUpdate-Setup.sh" /tmp/Flatpak-AutoUpdate-Setup.sh || exit 1
+            fetch_file "${CB_TOOLBOX}/Flatpak/Flatpak-AutoUpdate-Setup.sh" "${GH_TOOLBOX}/Flatpak/Flatpak-AutoUpdate-Setup.sh" /tmp/Flatpak-AutoUpdate-Setup.sh "Desktop/Flatpak/Flatpak-AutoUpdate-Setup.sh" || exit 1
             sudo bash /tmp/Flatpak-AutoUpdate-Setup.sh < "$INPUT"
             sudo rm -f /tmp/Flatpak-AutoUpdate-Setup.sh
             ;;

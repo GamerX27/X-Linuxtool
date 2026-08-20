@@ -65,6 +65,10 @@ require_cmd() {
 CODEBERG_RAW="https://codeberg.org/X27/X-Linuxtool/raw/branch/main/Desktop"
 GITHUB_RAW="https://raw.githubusercontent.com/GamerX27/X-Linuxtool/main/Desktop"
 
+# When invoked by a local X-Linuxtool.sh clone, X27_LOCAL_ROOT points at
+# the clone root; prefer the scripts already on disk over re-downloading.
+LOCAL_BASE="${X27_LOCAL_ROOT:+$X27_LOCAL_ROOT/Desktop}"
+
 _download() {
     # _download <url> <output-file>
     if command -v curl >/dev/null 2>&1; then
@@ -80,6 +84,12 @@ _download() {
 fetch_repo_file() {
     # fetch_repo_file <relative/path> <output-file>
     local rel="$1" out="$2"
+
+    if [ -n "$LOCAL_BASE" ] && [ -f "$LOCAL_BASE/$rel" ]; then
+        log "Using local copy: ${rel}"
+        cp "$LOCAL_BASE/$rel" "$out"
+        return 0
+    fi
 
     log "Fetching ${rel} from Codeberg"
     if _download "${CODEBERG_RAW}/${rel}" "$out"; then
