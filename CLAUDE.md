@@ -5,7 +5,8 @@ the menu entrypoint; it fetches and runs the picked script from `Desktop/`
 (desktop setup: Fedora, Bazzite, Gaming, Flatpak, Browser, Tools) or
 `Homelab/` (server/Docker scripts). Scripts are plain bash, fetched from
 Codeberg (primary) with a GitHub mirror fallback, and are meant to be run via
-`curl | bash` as well as locally.
+`curl | bash` as well as locally. The project is built around bash scripting,
+with JSON files used here and there (e.g. for config/data).
 
 ## Rules
 
