@@ -1,12 +1,7 @@
 #!/usr/bin/env bash
 #
-# Run this as your normal user (NOT with sudo). You will be asked for your
-# password once; system steps (including the system-wide Flatpak installs) then
-# use that cached sudo session, while per-user steps (e.g. Zed) run as you
-# without any further prompts.
-#
-# The script is idempotent: it can be re-run safely without aborting on
-# already-installed packages or already-configured repositories.
+# Run as your normal user, not with sudo — it caches its own sudo session
+# after one password prompt. Idempotent; safe to re-run.
 
 set -uo pipefail
 
@@ -103,7 +98,8 @@ fetch_repo_file() {
 # Ask a yes/no question; returns 0 for yes, 1 for anything else (default no).
 ask_yes_no() {
     local prompt="$1" answer
-    read -rp "$(printf '%s%s%s %s[y/N]%s: ' "$C_FG" "$prompt" "$C_RESET" "$C_GREY" "$C_RESET")" answer
+    printf '%s%s%s %s[y/N]%s: ' "$C_FG" "$prompt" "$C_RESET" "$C_GREY" "$C_RESET"
+    read -r answer
     case "${answer}" in
         [yY] | [yY][eE][sS]) return 0 ;;
         *) return 1 ;;
@@ -148,25 +144,37 @@ FEDORA_VERSION="$(rpm -E %fedora)"
 log "Detected Fedora ${FEDORA_VERSION}"
 
 log "Refreshing metadata and upgrading the system"
-sudo dnf update --refresh -y
-sudo dnf upgrade -y
+sudo dnf update --refresh -y \
+    && sudo dnf upgrade -y \
+    && ok "System updated." \
+    || warn "System update encountered issues (continuing)."
 
 log "Enabling RPM Fusion (free + nonfree) repositories"
 sudo dnf install -y \
     "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${FEDORA_VERSION}.noarch.rpm" \
-    "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FEDORA_VERSION}.noarch.rpm"
+    "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FEDORA_VERSION}.noarch.rpm" \
+    && ok "RPM Fusion enabled." \
+    || warn "Failed to enable RPM Fusion (continuing)."
 
 log "Enabling the Cisco OpenH264 repository"
-sudo dnf config-manager setopt fedora-cisco-openh264.enabled=1
+sudo dnf config-manager setopt fedora-cisco-openh264.enabled=1 \
+    && ok "Cisco OpenH264 repository enabled." \
+    || warn "Failed to enable the Cisco OpenH264 repository (continuing)."
 
 log "Updating the @core package group"
-sudo dnf update -y @core
+sudo dnf update -y @core \
+    && ok "@core package group updated." \
+    || warn "Failed to update @core package group (continuing)."
 
 log "Switching to the full ffmpeg build"
-sudo dnf swap ffmpeg-free ffmpeg --allowerasing -y
+sudo dnf swap ffmpeg-free ffmpeg --allowerasing -y \
+    && ok "Switched to the full ffmpeg build." \
+    || warn "Failed to switch to the full ffmpeg build (continuing)."
 
 log "Installing additional multimedia codecs"
-sudo dnf update -y @multimedia --setopt="install_weak_deps=False" --exclude=PackageKit-gstreamer-plugin
+sudo dnf update -y @multimedia --setopt="install_weak_deps=False" --exclude=PackageKit-gstreamer-plugin \
+    && ok "Multimedia codecs installed." \
+    || warn "Failed to install multimedia codecs (continuing)."
 
 log "Hardware-accelerated video codecs"
 printf '%sSelect your GPU vendor for hardware-accelerated (VA-API) codecs:%s\n' "$C_FG" "$C_RESET"
@@ -174,20 +182,27 @@ printf '  %s1)%s Intel (recent - Broadwell/5th-gen and newer)\n' "$C_ACCENT$C_BO
 printf '  %s2)%s Intel (older - pre-Broadwell)\n' "$C_ACCENT$C_BOLD" "$C_RESET"
 printf '  %s3)%s AMD\n' "$C_ACCENT$C_BOLD" "$C_RESET"
 printf '  %s4)%s Skip\n' "$C_ACCENT$C_BOLD" "$C_RESET"
-read -rp "$(printf '%sEnter choice%s %s[1/2/3/4]%s: ' "$C_FG" "$C_RESET" "$C_GREY" "$C_RESET")" gpu_choice
+printf '%sEnter choice%s %s[1/2/3/4]%s: ' "$C_FG" "$C_RESET" "$C_GREY" "$C_RESET"
+read -r gpu_choice
 
 case "${gpu_choice}" in
     1)
         log "Installing Intel (recent) hardware-accelerated codecs"
-        sudo dnf install -y intel-media-driver
+        sudo dnf install -y intel-media-driver \
+            && ok "Intel (recent) codecs installed." \
+            || warn "Failed to install Intel (recent) codecs (continuing)."
         ;;
     2)
         log "Installing Intel (older) hardware-accelerated codecs"
-        sudo dnf install -y libva-intel-driver
+        sudo dnf install -y libva-intel-driver \
+            && ok "Intel (older) codecs installed." \
+            || warn "Failed to install Intel (older) codecs (continuing)."
         ;;
     3)
         log "Installing AMD hardware-accelerated codecs"
-        sudo dnf install -y mesa-va-drivers-freeworld mesa-va-drivers-freeworld.i686
+        sudo dnf install -y mesa-va-drivers-freeworld mesa-va-drivers-freeworld.i686 \
+            && ok "AMD codecs installed." \
+            || warn "Failed to install AMD codecs (continuing)."
         ;;
     *)
         log "Skipping hardware-accelerated codec installation"
@@ -197,14 +212,20 @@ esac
 log "Removing unwanted default applications"
 sudo dnf remove -y \
     dragon juk elisa-player kmail khelpcenter kmahjongg kmines kpat firefox \
-    kaddressbook korganizer kolourpaint kamoso neochat 'libreoffice*'
+    kaddressbook korganizer kolourpaint kamoso neochat 'libreoffice*' \
+    && ok "Unwanted default applications removed." \
+    || warn "Failed to remove some default applications (continuing)."
 
 log "Installing base command-line tools"
 # Note: lspci ships in pciutils, sensors ships in lm_sensors.
-sudo dnf install -y wget fastfetch fish htop nano papirus-icon-theme curl pciutils lm_sensors
+sudo dnf install -y wget fastfetch fish htop nano papirus-icon-theme curl pciutils lm_sensors \
+    && ok "Base command-line tools installed." \
+    || warn "Failed to install base command-line tools (continuing)."
 
 log "Installing base applications"
-sudo dnf install -y vlc nextcloud-client easyeffects gnome-disk-utility libreoffice-writer gwenview
+sudo dnf install -y vlc nextcloud-client easyeffects gnome-disk-utility libreoffice-writer gwenview \
+    && ok "Base applications installed." \
+    || warn "Failed to install base applications (continuing)."
 
 require_cmd flatpak
 
@@ -213,20 +234,28 @@ log "Adding the Flathub remote"
 # system-wide too. This needs root: the cached sudo session covers it without
 # triggering a polkit prompt (which would otherwise fail in a non-interactive
 # context with "ConfigureRemote not allowed for user").
-sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo \
+    && ok "Flathub remote added." \
+    || warn "Failed to add the Flathub remote (continuing)."
 
 log "Running the Flatpak app install script"
 FLATPAKS_SCRIPT="$(mktemp /tmp/flatpaks.XXXXXX.sh)"
 fetch_repo_file "Flatpak/flatpaks.sh" "${FLATPAKS_SCRIPT}"
-sudo bash "${FLATPAKS_SCRIPT}"
+sudo bash "${FLATPAKS_SCRIPT}" \
+    && ok "Flatpak apps installed." \
+    || warn "Flatpak app install script reported issues (continuing)."
 rm -f "${FLATPAKS_SCRIPT}"
 
 log "Disabling the Fedora Flatpak remotes"
 sudo flatpak remote-modify fedora --disable
-sudo flatpak remote-modify fedora-testing --disable
+sudo flatpak remote-modify fedora-testing --disable \
+    && ok "Fedora Flatpak remotes disabled." \
+    || warn "Failed to disable the Fedora Flatpak remotes (continuing)."
 
 log "Installing Vivaldi (Flatpak)"
-sudo flatpak install -y flathub com.vivaldi.Vivaldi
+sudo flatpak install -y flathub com.vivaldi.Vivaldi \
+    && ok "Vivaldi installed." \
+    || warn "Failed to install Vivaldi (continuing)."
 
 log "Disabling the NetworkManager connectivity check"
 # An empty connectivity URI disables the check. We write the override to /etc
@@ -239,34 +268,46 @@ uri=
 EOF
 
 sudo dnf remove -y NetworkManager-config-connectivity-fedora
-sudo systemctl restart NetworkManager
+sudo systemctl restart NetworkManager \
+    && ok "NetworkManager connectivity check disabled." \
+    || warn "Failed to disable the NetworkManager connectivity check (continuing)."
 
 log "Waiting 10 seconds for NetworkManager to settle"
 sleep 10
 
 log "Installing the Brave browser (origin flavor)"
-curl -fsS https://dl.brave.com/install.sh | FLAVOR=origin sh
+curl -fsS https://dl.brave.com/install.sh | FLAVOR=origin sh \
+    && ok "Brave browser installed." \
+    || warn "Failed to install the Brave browser (continuing)."
 
 log "Applying Brave policy configuration"
 BRAVE_POLICY_SCRIPT="$(mktemp /tmp/make_brave_great_again.XXXXXX.sh)"
 fetch_repo_file "Browser/make_brave_great_again.sh" "${BRAVE_POLICY_SCRIPT}"
-sudo bash "${BRAVE_POLICY_SCRIPT}"
+sudo bash "${BRAVE_POLICY_SCRIPT}" \
+    && ok "Brave policy configuration applied." \
+    || warn "Failed to apply the Brave policy configuration (continuing)."
 rm -f "${BRAVE_POLICY_SCRIPT}"
 
 log "Installing LibreWolf"
 # --overwrite keeps this idempotent so re-running the script doesn't error out.
 sudo dnf config-manager addrepo --overwrite --from-repofile=https://repo.librewolf.net/librewolf.repo
-sudo dnf install -y librewolf
+sudo dnf install -y librewolf \
+    && ok "LibreWolf installed." \
+    || warn "Failed to install LibreWolf (continuing)."
 
 log "Installing additional browsers (Chromium, Tor Browser Launcher)"
-sudo dnf install -y chromium torbrowser-launcher
+sudo dnf install -y chromium torbrowser-launcher \
+    && ok "Chromium and Tor Browser Launcher installed." \
+    || warn "Failed to install Chromium/Tor Browser Launcher (continuing)."
 
 log "Gaming setup"
 if ask_yes_no "Would you like to run the gaming setup script?"; then
     log "Running the gaming setup script"
     GAMING_SCRIPT="$(mktemp /tmp/Gaming.XXXXXX.sh)"
     fetch_repo_file "Gaming/Gaming.sh" "${GAMING_SCRIPT}"
-    sudo bash "${GAMING_SCRIPT}"
+    sudo bash "${GAMING_SCRIPT}" \
+        && ok "Gaming setup complete." \
+        || warn "Gaming setup script reported issues (continuing)."
     rm -f "${GAMING_SCRIPT}"
 else
     log "Skipping gaming setup"
@@ -277,13 +318,17 @@ set_locale_time
 log "Zed editor"
 if ask_yes_no "Would you like to install the Zed editor?"; then
     log "Installing the Zed editor"
-    curl -f https://zed.dev/install.sh | sh
+    curl -f https://zed.dev/install.sh | sh \
+        && ok "Zed editor installed." \
+        || warn "Failed to install the Zed editor (continuing)."
 else
     log "Skipping Zed editor installation"
 fi
 
 log "Removing orphaned packages"
-sudo dnf autoremove -y
+sudo dnf autoremove -y \
+    && ok "Orphaned packages removed." \
+    || warn "Failed to remove orphaned packages (continuing)."
 
 log "Fedora post-setup complete."
 

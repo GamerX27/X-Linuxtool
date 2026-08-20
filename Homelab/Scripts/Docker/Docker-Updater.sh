@@ -497,7 +497,8 @@ apply_updates() {
     echo "    ${CHECK} ${U_IMAGE[$i]}  ${C_DIM}${origin}${C_RESET}"
   done
   echo
-  read -r -p "Proceed? [y/N] " ans
+  printf 'Proceed? [y/N] '
+  read -r ans
   [[ "${ans,,}" == "y" ]] || { warn "Aborted by user."; return 0; }
   echo
 
@@ -539,7 +540,8 @@ apply_updates() {
     echo
     warn "Standalone containers were created with 'docker run'. The new image is pulled,"
     warn "but the container must be recreated to use it."
-    read -r -p "Recreate ${#standalone[@]} standalone container(s) now? (best-effort) [y/N] " rec
+    printf 'Recreate %d standalone container(s) now? (best-effort) [y/N] ' "${#standalone[@]}"
+    read -r rec
     if [[ "${rec,,}" == "y" ]]; then
       if ensure_runlike; then
         for i in "${standalone[@]}"; do
@@ -555,7 +557,8 @@ apply_updates() {
   fi
 
   echo
-  read -r -p "Remove old dangling images to reclaim space? [y/N] " prune
+  printf 'Remove old dangling images to reclaim space? [y/N] '
+  read -r prune
   if [[ "${prune,,}" == "y" ]]; then
     docker image prune -f >/dev/null && ok "Pruned dangling images."
   fi
@@ -599,7 +602,8 @@ main() {
     root=""
   fi
   if [[ -z "$root" ]]; then
-    read -r -p "Directory to scan for compose files [.]: " root
+    printf 'Directory to scan for compose files [.]: '
+    read -r root
     root="${root:-.}"
   fi
   root="${root%/}"

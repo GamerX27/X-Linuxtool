@@ -112,7 +112,8 @@ ui_step "Running a update..."
 ujust update
 
 ui_ok "Setup complete! Reboot recommended."
-read -p "$(printf '%sReboot now?%s %s(y/n)%s: ' "$C_FG" "$C_RESET" "$C_GREY" "$C_RESET")" reboot_choice
+printf '%sReboot now?%s %s(y/n)%s: ' "$C_FG" "$C_RESET" "$C_GREY" "$C_RESET"
+read -r reboot_choice
 if [[ "$reboot_choice" == "y" || "$reboot_choice" == "Y" ]]; then
     ui_info "Rebooting in..."
     for count in 10 9 8 7 6 5 4 3 2 1 0; do

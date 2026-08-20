@@ -303,7 +303,8 @@ EOF
 
 configure_gotify() {
   ui_step "Gotify Notifications (optional)"
-  read -r -p "$(ui_prompt "Configure Gotify notifications for update runs? [y/N] ")" GOTIFY_ANS || true
+  ui_prompt "Configure Gotify notifications for update runs? [y/N] "
+  read -r GOTIFY_ANS || true
   if [[ "${GOTIFY_ANS,,}" != "y" ]]; then
     ui_info "Gotify notifications not configured."
     return 0
@@ -311,7 +312,8 @@ configure_gotify() {
 
   if ! command -v curl >/dev/null 2>&1; then
     ui_warn "curl is required for Gotify notifications but is not installed."
-    read -r -p "$(ui_prompt "Install curl now? [y/N] ")" CURL_ANS || true
+    ui_prompt "Install curl now? [y/N] "
+    read -r CURL_ANS || true
 
     if [[ "${CURL_ANS,,}" == "y" ]]; then
       ui_info "Installing curl..."
@@ -338,20 +340,23 @@ configure_gotify() {
 
   local url token priority
   while true; do
-    read -r -p "$(ui_prompt "Gotify base URL (e.g. https://gotify.example.com): ")" url
+    ui_prompt "Gotify base URL (e.g. https://gotify.example.com): "
+    read -r url
     url=$(echo "$url" | xargs)
     [[ -n "$url" ]] && break
     ui_warn "URL cannot be empty."
   done
 
   while true; do
-    read -r -p "$(ui_prompt "Gotify application token: ")" token
+    ui_prompt "Gotify application token: "
+    read -r token
     token=$(echo "$token" | xargs)
     [[ -n "$token" ]] && break
     ui_warn "Token cannot be empty."
   done
 
-  read -r -p "$(ui_prompt "Default Gotify priority [1-10, default 5]: ")" priority || true
+  ui_prompt "Default Gotify priority [1-10, default 5]: "
+  read -r priority || true
   priority=$(echo "$priority" | xargs)
   if [[ -z "$priority" ]]; then
     priority=5
@@ -379,7 +384,8 @@ read_schedule() {
 
   local MODE=""
   while true; do
-    read -r -p "$(ui_prompt "Schedule monthly or weekly updates? [m/w] ")" MODE || true
+    ui_prompt "Schedule monthly or weekly updates? [m/w] "
+    read -r MODE || true
     MODE=$(echo "$MODE" | xargs)
     case "${MODE,,}" in
       m|monthly)
@@ -462,7 +468,8 @@ read_schedule() {
   CRON_HR=$(printf '%02d' "$((10#$HH))")
   SCHEDULE_DESC="$SUMMARY at $CRON_HR:$CRON_MIN"
 
-  read -r -p "$(ui_prompt "Auto-reboot if required packages update? [y/N] ")" REBOOT_ANS || true
+  ui_prompt "Auto-reboot if required packages update? [y/N] "
+  read -r REBOOT_ANS || true
   if [[ "${REBOOT_ANS,,}" == "y" ]]; then
     AUTO_REBOOT="1"
   else
@@ -510,7 +517,8 @@ EOF
 }
 
 maybe_offer_run() {
-  read -r -p "$(ui_prompt "Run an update now? [y/N] ")" RUNNOW || true
+  ui_prompt "Run an update now? [y/N] "
+  read -r RUNNOW || true
   if [[ "${RUNNOW,,}" == "y" ]]; then
     /usr/local/bin/update-system
   fi
