@@ -1,27 +1,15 @@
 #!/usr/bin/env bash
-# Docker-Updater.sh
-# Scans a directory tree for Compose files and enumerates running containers
-# deployed elsewhere (other compose files, Portainer / external stacks, or
-# plain `docker run`). Every image is checked against its registry for a
-# newer version and presented in an interactive, category-grouped terminal
-# UI so you can pick exactly what to update; anything left unselected is
-# ignored, even if an update is available.
 
 set -uo pipefail
 
-# COMPOSE_ROOT overrides, highest priority first: CLI arg > COMPOSE_ROOT env
-# var > the value set here > auto-detected <home>/<COMPOSE_SUBDIR> (works
-# under sudo too, resolving the original user's home). Prompted if none
-# resolve to a real directory.
+# Priority: CLI arg > COMPOSE_ROOT env > this value > auto-detected <home>/<COMPOSE_SUBDIR>, else prompted.
 COMPOSE_ROOT=""
 COMPOSE_SUBDIR="docker"
 
-# Nord palette (https://www.nordtheme.com), matching the rest of the toolbox.
 if [[ -t 1 ]] && [[ "${TERM:-dumb}" != "dumb" ]] && [[ -z "${NO_COLOR:-}" ]]; then
   C_RESET=$'\e[0m'; C_BOLD=$'\e[1m'; C_DIM=$'\e[2m'
   case "${TERM:-}" in
     linux|screen|screen-*|tmux-*)
-      # Nearest 256-color approximations of the Nord palette.
       C_GREY=$'\e[38;5;244m'     # nord3  4c566a
       C_FG=$'\e[38;5;253m'       # nord4  d8dee9
       C_CYAN=$'\e[38;5;116m'     # nord8  88c0d0
@@ -84,10 +72,34 @@ pad_trunc() {
 }
 
 user_home() {
-  if [[ -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
-    local h; h=$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6)
+  # Nested sudo (e.g. from X27-Homelab.sh) resets SUDO_USER to "root", so
+  # loginuid is tried first (mirrors Docker-Install.sh).
+  local candidate=""
+
+  local login_uid
+  login_uid="$(cat /proc/self/loginuid 2>/dev/null || true)"
+  if [[ -n "$login_uid" && "$login_uid" != "4294967295" && "$login_uid" != "0" ]]; then
+    candidate="$(id -un "$login_uid" 2>/dev/null || true)"
+  fi
+
+  if [[ -z "$candidate" ]] && have logname; then
+    local ln; ln="$(logname 2>/dev/null || true)"
+    [[ -n "$ln" && "$ln" != "root" ]] && candidate="$ln"
+  fi
+
+  if [[ -z "$candidate" && -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
+    candidate="$SUDO_USER"
+  fi
+
+  if [[ -z "$candidate" && -n "${USER:-}" && "$USER" != "root" ]]; then
+    candidate="$USER"
+  fi
+
+  if [[ -n "$candidate" ]]; then
+    local h; h=$(getent passwd "$candidate" 2>/dev/null | cut -d: -f6)
     [[ -n "$h" ]] && { printf '%s' "$h"; return; }
   fi
+
   printf '%s' "${HOME:-/root}"
 }
 
@@ -127,7 +139,6 @@ local_digest() {
     | sed -n 's/.*@//p' | head -n1
 }
 
-# Remote digest of an image's tag without pulling layers.
 remote_digest() {
   local image="$1" d=""
   if docker buildx version >/dev/null 2>&1; then
@@ -294,8 +305,7 @@ collect_containers() {
         fi
         add_candidate "$image" "compose-ext" "$abs" "$name"
       else
-        # compose-labelled but the file isn't reachable here (typical of
-        # Portainer stacks that live inside Portainer's own volume).
+        # compose-labelled but unreachable here, typical of Portainer stacks.
         add_candidate "$image" "external" "" "$name"
       fi
     else
@@ -322,8 +332,6 @@ reorder_by_category() {
 cursor_hide() { [[ -t 1 ]] && printf '\e[?25l'; }
 cursor_show() { [[ -t 1 ]] && printf '\e[?25h'; }
 
-# Global kill switch: Ctrl+C (SIGINT) / SIGTERM aborts cleanly at any point,
-# restoring the cursor and leaving the system untouched from here on.
 on_interrupt() {
   cursor_show
   printf '\n'
@@ -376,7 +384,6 @@ draw_menu() {
     src_str=$(pad_trunc "$src" "$SRC_W")
 
     if [[ "$i" -eq "$cursor" ]]; then
-      # Highlighted row: a solid accent bar, matching the toolbox's picker style.
       local cb_txt sel_txt
       [[ "${U_SEL[$i]}" == "1" ]] && cb_txt="[x]" || cb_txt="[ ]"
       if [[ "${U_STATE[$i]}" == "new" ]]; then sel_txt=$(printf '%-8s' 'new')

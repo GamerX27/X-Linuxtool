@@ -7,7 +7,6 @@ if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
 
     case "${TERM:-}" in
         linux|screen|screen-*|tmux-*)
-            # Nearest 256-color approximations of the Nord palette.
             C_GREY=$'\033[38;5;244m'    # nord3  4c566a
             C_FG=$'\033[38;5;253m'      # nord4  d8dee9
             C_BLUE=$'\033[38;5;110m'    # nord9  81a1c1
@@ -41,24 +40,19 @@ ui_step()    { printf '\n%s  ➤ %s%s\n' "$C_MAGENTA$C_BOLD" "$1" "$C_RESET"; }
 ui_rule()    { printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM$C_GREY" "$C_RESET"; }
 
 ui_menu_item() {
-    # ui_menu_item <number> <label> <desc>
     printf '   %s%s)%s %s%s%s  %s%s%s\n' \
         "$C_ACCENT$C_BOLD" "$1" "$C_RESET" \
         "$C_BOLD" "$2" "$C_RESET" \
         "$C_GREY$C_DIM" "$3" "$C_RESET"
 }
 
-# Codeberg is the primary source; GitHub is a mirror used as a fallback when
-# Codeberg cannot be reached.
 CODEBERG_RAW="https://codeberg.org/X27/X-Linuxtool/raw/branch/main/Homelab"
 GITHUB_RAW="https://raw.githubusercontent.com/GamerX27/X-Linuxtool/main/Homelab"
 
-# When invoked by a local X-Linuxtool.sh clone, X27_LOCAL_ROOT points at
-# the clone root; prefer the scripts already on disk over re-downloading.
+# Set by X-Linuxtool.sh when run from a local clone, to use scripts on disk.
 LOCAL_BASE="${X27_LOCAL_ROOT:+$X27_LOCAL_ROOT/Homelab}"
 
 _download() {
-    # _download <url> <output-file>
     if command -v curl >/dev/null 2>&1; then
         curl -fsSL "$1" -o "$2"
     elif command -v wget >/dev/null 2>&1; then
@@ -70,7 +64,6 @@ _download() {
 }
 
 fetch_repo_file() {
-    # fetch_repo_file <relative/path> <output-file>
     local rel="$1" out="$2"
 
     if [ -n "$LOCAL_BASE" ] && [ -f "$LOCAL_BASE/$rel" ]; then
@@ -95,10 +88,6 @@ fetch_repo_file() {
     return 1
 }
 
-# Loop this submenu until the user explicitly backs out, so finishing one
-# task (e.g. installing Docker) returns here instead of exiting the script —
-# that's what lets you run another HomeLab task, or pick "Back" to return to
-# the main X-Linuxtool.sh menu.
 while true; do
     clear 2>/dev/null
     ui_step "HomeLab"

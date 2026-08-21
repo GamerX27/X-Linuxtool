@@ -9,7 +9,6 @@ if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
 
     case "${TERM:-}" in
         linux|screen|screen-*|tmux-*)
-            # Nearest 256-color approximations of the Nord palette.
             C_GREY=$'\033[38;5;244m'    # nord3  4c566a
             C_FG=$'\033[38;5;253m'      # nord4  d8dee9
             C_BLUE=$'\033[38;5;110m'    # nord9  81a1c1
@@ -46,11 +45,8 @@ TARGET_USER=""
 
 is_cmd() { command -v "$1" >/dev/null 2>&1; }
 
-# SUDO_USER alone is unreliable here: this script is often invoked via a
-# nested `sudo` call made by a process that is already root (e.g.
-# X27-Homelab.sh), which resets SUDO_USER to "root" instead of the real
-# login user. /proc/self/loginuid survives nested su/sudo, so it's tried
-# first.
+# Nested sudo (e.g. from X27-Homelab.sh) resets SUDO_USER to "root", so
+# loginuid is tried first since it survives nested su/sudo.
 detect_target_user() {
   local candidate=""
 

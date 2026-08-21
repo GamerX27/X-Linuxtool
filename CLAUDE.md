@@ -21,7 +21,10 @@ with JSON files used here and there (e.g. for config/data).
 - **Minimal comments.** Default to no comments. Only add one when it explains
   a non-obvious WHY (a workaround, a distro/env quirk, a magic number) —
   never a comment that just restates what the next line does, and never
-  decorative section banners.
+  decorative section banners. This includes file-top header comments that
+  restate the filename or summarize what the script does (that belongs in
+  the commit message / this doc, not the file) and comments repeating a
+  function's own signature (`# foo <arg1> <arg2>`).
 - **Never `git commit` or `git push` without the user explicitly asking for
   it in that moment.** Making changes to files is fine; committing/pushing is
   not implied by that and always needs a direct go-ahead first.
