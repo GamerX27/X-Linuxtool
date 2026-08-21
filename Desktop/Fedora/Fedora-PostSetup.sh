@@ -232,6 +232,61 @@ sudo dnf install -y wget fastfetch fish htop nano papirus-icon-theme curl pciuti
     && ok "Base command-line tools installed." \
     || warn "Failed to install base command-line tools (continuing)."
 
+log "Setting Fish as the default login shell"
+sudo chsh -s "$(command -v fish)" "$USER" \
+    && ok "Fish set as the default login shell." \
+    || warn "Failed to set Fish as the default login shell (continuing)."
+
+log "Configuring Konsole (Fish default profile, hidden toolbars)"
+mkdir -p ~/.local/share/konsole ~/.local/share/kxmlgui5/konsole
+
+cat > ~/.local/share/konsole/Fish.profile <<'EOF'
+[General]
+Command=/usr/bin/fish
+Name=Fish
+Parent=FALLBACK/
+EOF
+
+cat > ~/.config/konsolerc <<'EOF'
+[Desktop Entry]
+DefaultProfile=Fish.profile
+
+[General]
+ConfigVersion=1
+
+[MainWindow]
+MenuBar=Disabled
+
+[SplitView]
+SplitViewVisibility=AlwaysHideSplitHeader
+
+[TabBar]
+TabBarVisibility=AlwaysHideTabBar
+EOF
+
+# Minimal KXMLGUI override; Konsole merges "hidden" into its built-in toolbar defs on launch.
+cat > ~/.local/share/kxmlgui5/konsole/konsoleui.rc <<'EOF'
+<?xml version="1.0"?>
+<!DOCTYPE gui SYSTEM "kpartgui.dtd">
+<gui name="konsole" version="1">
+    <ToolBar name="mainToolBar" hidden="true">
+        <text>Main Toolbar</text>
+    </ToolBar>
+</gui>
+EOF
+
+cat > ~/.local/share/kxmlgui5/konsole/sessionui.rc <<'EOF'
+<?xml version="1.0"?>
+<!DOCTYPE gui SYSTEM "kpartgui.dtd">
+<gui name="session" version="1">
+    <ToolBar name="sessionToolbar" hidden="true">
+        <text>Session Toolbar</text>
+    </ToolBar>
+</gui>
+EOF
+
+ok "Konsole configured: Fish is the default profile, all toolbars/tab bar hidden."
+
 log "Installing base applications"
 sudo dnf install -y vlc nextcloud-client easyeffects gnome-disk-utility libreoffice-writer gwenview \
     && ok "Base applications installed." \
