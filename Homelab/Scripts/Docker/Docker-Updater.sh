@@ -1,75 +1,57 @@
 #!/usr/bin/env bash
 # Docker-Updater.sh
-# Scans a directory tree for Docker Compose files (docker-compose.yml / compose.yml)
-# AND enumerates running containers deployed elsewhere (other compose files,
-# Portainer / external stacks, or plain `docker run`). Every image is checked
-# against its registry for a newer version and presented in an interactive,
-# category-grouped terminal UI so you can pick exactly what to update.
-#
-# Controls:
-#   Up / Down  (or k / j) ... move the cursor
-#   Space ................... toggle selection of the highlighted image
-#   a ....................... select / deselect all
-#   Enter ................... update the selected images
-#   q / Esc ................. quit without changing anything
-#
-# Only the images you select are pulled and recreated. Everything you leave
-# unselected is ignored, even if an update is available.
-#
-# How each category is updated:
-#   Compose (scanned)        -> docker compose -f <file> up -d
-#   Compose (other host file)-> docker compose -f <file> up -d
-#   External / Portainer     -> image pulled; redeploy in Portainer to apply
-#   Standalone (docker run)  -> image pulled; optional best-effort recreate (runlike)
+# Scans a directory tree for Compose files and enumerates running containers
+# deployed elsewhere (other compose files, Portainer / external stacks, or
+# plain `docker run`). Every image is checked against its registry for a
+# newer version and presented in an interactive, category-grouped terminal
+# UI so you can pick exactly what to update; anything left unselected is
+# ignored, even if an update is available.
 
 set -uo pipefail
 
-# ===========================================================================
-# USER CONFIG
-# ===========================================================================
-# Base directory that holds your compose stacks, one service per sub-folder,
-# e.g.:
-#   /home/x27/docker/jellyfin/compose.yml
-#   /home/x27/docker/nextcloud/docker-compose.yml
-# The script searches recursively under this path for compose files.
-#
-# Leave COMPOSE_ROOT empty to auto-detect the current user's home directory and
-# use "<home>/<COMPOSE_SUBDIR>" (e.g. /home/x27/docker). The detection also works
-# when the script is run with sudo (it resolves the original user's home).
-#
-# Override order (highest priority first):
-#   1. Path given as the first CLI argument
-#   2. COMPOSE_ROOT environment variable
-#   3. The value set here
-#   4. Auto-detected  <home>/<COMPOSE_SUBDIR>
-# If none resolve to a real directory you will be prompted.
+# COMPOSE_ROOT overrides, highest priority first: CLI arg > COMPOSE_ROOT env
+# var > the value set here > auto-detected <home>/<COMPOSE_SUBDIR> (works
+# under sudo too, resolving the original user's home). Prompted if none
+# resolve to a real directory.
 COMPOSE_ROOT=""
 COMPOSE_SUBDIR="docker"
 
+# Nord palette (https://www.nordtheme.com), matching the rest of the toolbox.
 if [[ -t 1 ]] && [[ "${TERM:-dumb}" != "dumb" ]] && [[ -z "${NO_COLOR:-}" ]]; then
-  C_RESET=$'\e[0m'; C_BOLD=$'\e[1m'; C_DIM=$'\e[2m'; C_INV=$'\e[7m'
+  C_RESET=$'\e[0m'; C_BOLD=$'\e[1m'; C_DIM=$'\e[2m'
   case "${TERM:-}" in
     linux|screen|screen-*|tmux-*)
       # Nearest 256-color approximations of the Nord palette.
-      C_RED=$'\e[38;5;167m'     # nord11 bf616a
-      C_GREEN=$'\e[38;5;150m'   # nord14 a3be8c
-      C_YELLOW=$'\e[38;5;222m'  # nord13 ebcb8b
-      C_BLUE=$'\e[38;5;110m'    # nord9  81a1c1
-      C_CYAN=$'\e[38;5;116m'    # nord8  88c0d0
-      C_MAGENTA=$'\e[38;5;139m' # nord15 b48ead
+      C_GREY=$'\e[38;5;244m'     # nord3  4c566a
+      C_FG=$'\e[38;5;253m'       # nord4  d8dee9
+      C_CYAN=$'\e[38;5;116m'     # nord8  88c0d0
+      C_BLUE=$'\e[38;5;110m'     # nord9  81a1c1
+      C_RED=$'\e[38;5;167m'      # nord11 bf616a
+      C_YELLOW=$'\e[38;5;222m'   # nord13 ebcb8b
+      C_GREEN=$'\e[38;5;150m'    # nord14 a3be8c
+      C_MAGENTA=$'\e[38;5;139m'  # nord15 b48ead
+      C_ACCENT=$'\e[38;5;167m'   # nord11 bf616a
+      BG_ACCENT=$'\e[48;5;167m'  # nord11 bf616a
+      FG_ONACCENT=$'\e[38;5;236m' # nord0  2e3440
       ;;
     *)
-      C_RED=$'\e[38;2;191;97;106m'      # nord11 bf616a
-      C_GREEN=$'\e[38;2;163;190;140m'   # nord14 a3be8c
-      C_YELLOW=$'\e[38;2;235;203;139m'  # nord13 ebcb8b
-      C_BLUE=$'\e[38;2;129;161;193m'    # nord9  81a1c1
+      C_GREY=$'\e[38;2;76;86;106m'      # nord3  4c566a
+      C_FG=$'\e[38;2;216;222;233m'      # nord4  d8dee9
       C_CYAN=$'\e[38;2;136;192;208m'    # nord8  88c0d0
+      C_BLUE=$'\e[38;2;129;161;193m'    # nord9  81a1c1
+      C_RED=$'\e[38;2;191;97;106m'      # nord11 bf616a
+      C_YELLOW=$'\e[38;2;235;203;139m'  # nord13 ebcb8b
+      C_GREEN=$'\e[38;2;163;190;140m'   # nord14 a3be8c
       C_MAGENTA=$'\e[38;2;180;142;173m' # nord15 b48ead
+      C_ACCENT=$'\e[38;2;191;97;106m'   # nord11 bf616a
+      BG_ACCENT=$'\e[48;2;191;97;106m'  # nord11 bf616a
+      FG_ONACCENT=$'\e[38;2;46;52;64m'  # nord0  2e3440
       ;;
   esac
 else
-  C_RESET="" C_BOLD="" C_DIM="" C_RED="" C_GREEN="" C_YELLOW=""
-  C_BLUE="" C_CYAN="" C_MAGENTA="" C_INV=""
+  C_RESET="" C_BOLD="" C_DIM="" C_GREY="" C_FG=""
+  C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_CYAN="" C_MAGENTA="" C_ACCENT=""
+  BG_ACCENT="" FG_ONACCENT=""
 fi
 
 CHECK="${C_GREEN}✔${C_RESET}"
@@ -77,18 +59,20 @@ CROSS="${C_RED}✘${C_RESET}"
 BOX_ON="${C_GREEN}[x]${C_RESET}"
 BOX_OFF="${C_DIM}[ ]${C_RESET}"
 
-die()  { printf '%s  ✖%s %s\n' "$C_RED" "$C_RESET" "$*" >&2; exit 1; }
-info() { printf '%s  ›%s %s\n' "$C_BLUE" "$C_RESET" "$*"; }
-ok()   { printf '%s  ✔%s %s\n' "$C_GREEN" "$C_RESET" "$*"; }
-warn() { printf '%s  ▲%s %s\n' "$C_YELLOW" "$C_RESET" "$*"; }
-have() { command -v "$1" >/dev/null 2>&1; }
+ui_info()  { printf '%s  ›%s %s\n'   "$C_BLUE"   "$C_RESET" "$1"; }
+ui_ok()    { printf '%s  ✔%s %s\n'   "$C_GREEN"  "$C_RESET" "$1"; }
+ui_warn()  { printf '%s  ▲%s %s\n'   "$C_YELLOW" "$C_RESET" "$1"; }
+ui_err()   { printf '%s  ✖%s %s\n'   "$C_RED"    "$C_RESET" "$1" >&2; }
+ui_step()  { printf '\n%s  ➤ %s%s\n' "$C_MAGENTA$C_BOLD" "$1" "$C_RESET"; }
+ui_rule()  { printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM$C_GREY" "$C_RESET"; }
+die()      { ui_err "$*"; exit 1; }
+have()     { command -v "$1" >/dev/null 2>&1; }
 
 abspath() {
   if have realpath; then realpath -m "$1" 2>/dev/null
   else readlink -f "$1" 2>/dev/null || echo "$1"; fi
 }
 
-# Pad (or truncate with an ellipsis) a string to an exact visible width.
 pad_trunc() {
   local s="$1" n="$2" len pad
   len=${#s}
@@ -99,7 +83,6 @@ pad_trunc() {
   printf '%s%*s' "$s" "$pad" ''
 }
 
-# Resolve the home directory of the human running the script, even under sudo.
 user_home() {
   if [[ -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]]; then
     local h; h=$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6)
@@ -108,7 +91,6 @@ user_home() {
   printf '%s' "${HOME:-/root}"
 }
 
-# Resolve the `docker compose` (v2) or `docker-compose` (v1) invocation.
 COMPOSE_CMD=()
 detect_compose() {
   if docker compose version >/dev/null 2>&1; then
@@ -133,7 +115,6 @@ compose_images() {
   "${COMPOSE_CMD[@]}" -f "$file" config --images 2>/dev/null | sed '/^$/d'
 }
 
-# Read a single label from a container; prints empty string if absent.
 container_label() {
   local name="$1" label="$2" val
   val=$(docker inspect -f "{{index .Config.Labels \"$label\"}}" "$name" 2>/dev/null)
@@ -141,7 +122,6 @@ container_label() {
   printf '%s' "$val"
 }
 
-# Local digest of an image (empty = not present locally).
 local_digest() {
   docker image inspect "$1" --format '{{range .RepoDigests}}{{println .}}{{end}}' 2>/dev/null \
     | sed -n 's/.*@//p' | head -n1
@@ -174,7 +154,6 @@ declare -A CHK_CACHE=()    # image -> state
 declare -A CAND_SEEN=()    # dedupe key -> 1
 declare -A SCANNED_FILES=() # abs path -> 1
 
-# Running-container index (built once, up front).
 declare -a CT_NAME=() CT_IMAGE=() CT_PROJ=() CT_CFG=()
 declare -A CN_BY_KEY=()    # "<absfile>|<image>" -> container name
 declare -A CN_BY_IMAGE=()  # image -> container name (fallback)
@@ -183,15 +162,14 @@ CAT_ORDER=(compose compose-ext external standalone)
 
 cat_label() {
   case "$1" in
-    compose)     printf '%s' "📁 Compose files (scanned directory)" ;;
-    compose-ext) printf '%s' "📂 Compose (other files on this host)" ;;
-    external)    printf '%s' "🐳 External / Portainer-managed stacks" ;;
-    standalone)  printf '%s' "📦 Standalone containers (docker run)" ;;
+    compose)     printf '%s' "Compose files (scanned directory)" ;;
+    compose-ext) printf '%s' "Compose (other files on this host)" ;;
+    external)    printf '%s' "External / Portainer-managed stacks" ;;
+    standalone)  printf '%s' "Standalone containers (docker run)" ;;
     *)           printf '%s' "$1" ;;
   esac
 }
 
-# image -> update state, cached.
 classify_state() {
   local image="$1"
   if [[ -n "${CHK_CACHE[$image]:-}" ]]; then printf '%s' "${CHK_CACHE[$image]}"; return; fi
@@ -234,8 +212,6 @@ add_candidate() {
   esac
 }
 
-# Index every running container once so we can show container names next to
-# their images (and reuse the data when classifying non-compose containers).
 build_container_index() {
   local -a names=()
   mapfile -t names < <(docker ps --format '{{.Names}}' 2>/dev/null | sort)
@@ -260,7 +236,6 @@ build_container_index() {
   done
 }
 
-# Best-effort container name for a compose image in a given file.
 lookup_container() {
   local abs="$1" image="$2"
   if [[ -n "${CN_BY_KEY["$abs|$image"]:-}" ]]; then printf '%s' "${CN_BY_KEY["$abs|$image"]}"; return; fi
@@ -277,15 +252,15 @@ collect_compose() {
   )
 
   if [[ ${#files[@]} -eq 0 ]]; then
-    warn "No docker-compose.yml / compose.yml files found under: $root"
+    ui_warn "No docker-compose.yml / compose.yml files found under: $root"
     return 0
   fi
   if [[ ${#COMPOSE_CMD[@]} -eq 0 ]]; then
-    warn "Found compose files but no 'docker compose' binary; skipping compose scan."
+    ui_warn "Found compose files but no 'docker compose' binary; skipping compose scan."
     return 0
   fi
 
-  info "Scanning ${C_BOLD}${#files[@]}${C_RESET} compose file(s) under ${C_BOLD}$root${C_RESET}"
+  ui_info "Scanning ${C_BOLD}${#files[@]}${C_RESET} compose file(s) under ${C_BOLD}$root${C_RESET}"
   local file image abs
   for file in "${files[@]}"; do
     abs=$(abspath "$file"); SCANNED_FILES[$abs]=1
@@ -304,7 +279,7 @@ collect_compose() {
 collect_containers() {
   [[ ${#CT_NAME[@]} -gt 0 ]] || return 0
 
-  info "Inspecting ${C_BOLD}${#CT_NAME[@]}${C_RESET} running container(s) deployed on this host"
+  ui_info "Inspecting ${C_BOLD}${#CT_NAME[@]}${C_RESET} running container(s) deployed on this host"
   local i name image proj cfg first abs
   for i in "${!CT_NAME[@]}"; do
     name="${CT_NAME[$i]}"; image="${CT_IMAGE[$i]}"
@@ -330,7 +305,6 @@ collect_containers() {
   echo
 }
 
-# Reorder entries so the UI groups them by category.
 reorder_by_category() {
   local -a I=() C=() F=() N=() S=() L=()
   local cat i
@@ -353,7 +327,7 @@ cursor_show() { [[ -t 1 ]] && printf '\e[?25h'; }
 on_interrupt() {
   cursor_show
   printf '\n'
-  echo "${C_YELLOW}Interrupted (Ctrl+C) — aborting. No further changes will be made.${C_RESET}" >&2
+  ui_warn "Interrupted (Ctrl+C) — aborting. No further changes will be made." >&2
   exit 130
 }
 trap on_interrupt INT TERM
@@ -363,18 +337,18 @@ draw_menu() {
   local cursor="$1"
   local NAME_W=22 IMG_W=40 SRC_W=14
   clear
-  echo "${C_BOLD}${C_MAGENTA}╔════════════════════════════════════════════════════════════════════════╗${C_RESET}"
-  echo "${C_BOLD}${C_MAGENTA}║${C_RESET}  ${C_BOLD}Docker Updater${C_RESET}  ${C_DIM}— choose which images to update${C_RESET}                        ${C_BOLD}${C_MAGENTA}║${C_RESET}"
-  echo "${C_BOLD}${C_MAGENTA}╚════════════════════════════════════════════════════════════════════════╝${C_RESET}"
+  echo "${C_GREY}${C_BOLD}╔════════════════════════════════════════════════════════════════════════╗${C_RESET}"
+  echo "${C_GREY}${C_BOLD}║${C_RESET}  ${C_ACCENT}${C_BOLD}Docker Updater${C_RESET}  ${C_DIM}${C_GREY}— choose which images to update${C_RESET}                        ${C_GREY}${C_BOLD}║${C_RESET}"
+  echo "${C_GREY}${C_BOLD}╚════════════════════════════════════════════════════════════════════════╝${C_RESET}"
   echo
-  echo "  ${C_BOLD}${C_CYAN}↑/↓${C_RESET} move    ${C_BOLD}${C_CYAN}Space${C_RESET} toggle    ${C_BOLD}${C_CYAN}a${C_RESET} all    ${C_BOLD}${C_GREEN}Enter${C_RESET} update    ${C_BOLD}${C_RED}q / Ctrl+C${C_RESET} quit"
+  echo "  ${C_ACCENT}${C_BOLD}↑/↓${C_RESET} move    ${C_ACCENT}${C_BOLD}Space${C_RESET} toggle    ${C_ACCENT}${C_BOLD}a${C_RESET} all    ${C_GREEN}${C_BOLD}Enter${C_RESET} update    ${C_ACCENT}${C_BOLD}q / Ctrl+C${C_RESET} quit"
 
   local count=0 i
   for i in "${!U_IMAGE[@]}"; do [[ "${U_SEL[$i]}" == "1" ]] && ((count++)); done
 
   echo
   printf '    %-4s %-8s %-*s %-*s %s\n' "SEL" "STATE" "$NAME_W" "CONTAINER" "$IMG_W" "IMAGE" "SOURCE"
-  printf '    %s\n' "${C_DIM}────────────────────────────────────────────────────────────────────────────────${C_RESET}"
+  printf '    %s\n' "${C_DIM}${C_GREY}────────────────────────────────────────────────────────────────────────────────${C_RESET}"
 
   local last_cat=""
   for i in "${!U_IMAGE[@]}"; do
@@ -386,10 +360,8 @@ draw_menu() {
       echo "  ${C_BOLD}${C_BLUE}$(cat_label "$last_cat")${C_RESET} ${C_DIM}(${cnt})${C_RESET}"
     fi
 
-    # checkbox
-    local cb_str state_str name_str img_str src_str pointer name src
+    local cb_str state_str name_str img_str src_str name src
     if [[ "${U_SEL[$i]}" == "1" ]]; then cb_str="${C_GREEN}[x]${C_RESET}"; else cb_str="${C_DIM}[ ]${C_RESET}"; fi
-    # state badge (fixed width 8)
     if [[ "${U_STATE[$i]}" == "new" ]]; then
       state_str="${C_YELLOW}$(printf '%-8s' 'new')${C_RESET}"
     else
@@ -404,12 +376,13 @@ draw_menu() {
     src_str=$(pad_trunc "$src" "$SRC_W")
 
     if [[ "$i" -eq "$cursor" ]]; then
-      # Highlighted row: bright pointer + bold container/image so the cursor pops.
-      pointer="${C_CYAN}${C_BOLD}❯${C_RESET}"
-      printf '  %b %b %b  %b%b%b %b%b%b  %b\n' \
-        "$pointer" "$cb_str" "$state_str" \
-        "${C_BOLD}${C_CYAN}" "$name_str" "$C_RESET" \
-        "${C_BOLD}" "$img_str" "$C_RESET" "${C_DIM}${src_str}${C_RESET}"
+      # Highlighted row: a solid accent bar, matching the toolbox's picker style.
+      local cb_txt sel_txt
+      [[ "${U_SEL[$i]}" == "1" ]] && cb_txt="[x]" || cb_txt="[ ]"
+      if [[ "${U_STATE[$i]}" == "new" ]]; then sel_txt=$(printf '%-8s' 'new')
+      else sel_txt=$(printf '%-8s' 'update'); fi
+      printf '  %s❯ %s %s  %s %s  %s%s\n' \
+        "$BG_ACCENT$FG_ONACCENT$C_BOLD" "$cb_txt" "$sel_txt" "$name_str" "$img_str" "$src_str" "$C_RESET"
     else
       printf '    %b %b  %b%b%b %s  %b\n' \
         "$cb_str" "$state_str" "${C_CYAN}" "$name_str" "$C_RESET" "$img_str" "${C_DIM}${src_str}${C_RESET}"
@@ -450,7 +423,7 @@ select_images() {
 
 ensure_runlike() {
   docker image inspect assaflavie/runlike >/dev/null 2>&1 && return 0
-  info "Pulling helper image assaflavie/runlike (used to rebuild the run command)"
+  ui_info "Pulling helper image assaflavie/runlike (used to rebuild the run command)"
   docker pull assaflavie/runlike >/dev/null 2>&1
 }
 
@@ -458,21 +431,21 @@ recreate_standalone() {
   local name="$1" cmd ts backup
   cmd=$(docker run --rm -v /var/run/docker.sock:/var/run/docker.sock assaflavie/runlike "$name" 2>/dev/null)
   if [[ "$cmd" != docker\ run* ]]; then
-    warn "Could not rebuild run command for '$name'; image pulled, recreate it manually."
+    ui_warn "Could not rebuild run command for '$name'; image pulled, recreate it manually."
     return 1
   fi
 
   ts=$(date +%s); backup="${name}__old_${ts}"
   docker stop "$name" >/dev/null 2>&1 || true
-  docker rename "$name" "$backup" >/dev/null 2>&1 || { warn "Could not back up '$name'."; return 1; }
+  docker rename "$name" "$backup" >/dev/null 2>&1 || { ui_warn "Could not back up '$name'."; return 1; }
 
   if eval "$cmd" >/dev/null 2>&1; then
-    ok "Recreated '$name' on the new image."
+    ui_ok "Recreated '$name' on the new image."
     docker rm "$backup" >/dev/null 2>&1 || true
     return 0
   fi
 
-  warn "Recreate failed for '$name'; restoring the previous container."
+  ui_warn "Recreate failed for '$name'; restoring the previous container."
   docker rm -f "$name" >/dev/null 2>&1 || true
   docker rename "$backup" "$name" >/dev/null 2>&1 || true
   docker start "$name" >/dev/null 2>&1 || true
@@ -483,10 +456,10 @@ apply_updates() {
   local -a sel=()
   local i
   for i in "${!U_IMAGE[@]}"; do [[ "${U_SEL[$i]}" == "1" ]] && sel+=("$i"); done
-  if [[ ${#sel[@]} -eq 0 ]]; then warn "Nothing selected. No changes made."; return 0; fi
+  if [[ ${#sel[@]} -eq 0 ]]; then ui_warn "Nothing selected. No changes made."; return 0; fi
 
   clear
-  echo "${C_BOLD}The following images will be updated:${C_RESET}"
+  ui_step "The following images will be updated:"
   echo
   local last_cat=""
   for i in "${sel[@]}"; do
@@ -497,59 +470,56 @@ apply_updates() {
     echo "    ${CHECK} ${U_IMAGE[$i]}  ${C_DIM}${origin}${C_RESET}"
   done
   echo
-  printf 'Proceed? [y/N] '
+  printf '%s  ❯%s Proceed? %s[y/N]%s ' "$C_ACCENT$C_BOLD" "$C_RESET" "$C_GREY" "$C_RESET"
   read -r ans
-  [[ "${ans,,}" == "y" ]] || { warn "Aborted by user."; return 0; }
+  [[ "${ans,,}" == "y" ]] || { ui_warn "Aborted by user."; return 0; }
   echo
 
-  # 1) Pull every selected image (deduped).
   local -A pulled=()
   for i in "${sel[@]}"; do
     [[ -n "${pulled[${U_IMAGE[$i]}]:-}" ]] && continue
     pulled[${U_IMAGE[$i]}]=1
-    info "Pulling ${C_BOLD}${U_IMAGE[$i]}${C_RESET}"
-    docker pull "${U_IMAGE[$i]}" || warn "Failed to pull ${U_IMAGE[$i]}"
+    ui_info "Pulling ${C_BOLD}${U_IMAGE[$i]}${C_RESET}"
+    docker pull "${U_IMAGE[$i]}" || ui_warn "Failed to pull ${U_IMAGE[$i]}"
   done
   echo
 
-  # 2) Recreate compose-backed services (only changed images recreate).
   local -A files=()
   for i in "${sel[@]}"; do
     case "${U_CAT[$i]}" in compose|compose-ext) [[ -n "${U_FILE[$i]}" ]] && files["${U_FILE[$i]}"]=1 ;; esac
   done
   local f
   for f in "${!files[@]}"; do
-    info "Recreating affected services from ${C_BOLD}$f${C_RESET}"
-    "${COMPOSE_CMD[@]}" -f "$f" up -d && ok "Updated services in $f" || warn "compose up failed for $f"
+    ui_info "Recreating affected services from ${C_BOLD}$f${C_RESET}"
+    "${COMPOSE_CMD[@]}" -f "$f" up -d && ui_ok "Updated services in $f" || ui_warn "compose up failed for $f"
   done
 
-  # 3) External / Portainer stacks: image is pulled, redeploy needed.
   local -a ext=()
   for i in "${sel[@]}"; do [[ "${U_CAT[$i]}" == "external" ]] && ext+=("$i"); done
   if [[ ${#ext[@]} -gt 0 ]]; then
     echo
-    warn "External / Portainer-managed stacks — new images pulled, but they must be"
-    warn "redeployed in their manager to take effect (Portainer: 'Re-pull & redeploy'):"
+    ui_warn "External / Portainer-managed stacks — new images pulled, but they must be"
+    ui_warn "redeployed in their manager to take effect (Portainer: 'Re-pull & redeploy'):"
     for i in "${ext[@]}"; do echo "    • ${U_CONTAINER[$i]}  ${C_DIM}(${U_IMAGE[$i]})${C_RESET}"; done
   fi
 
-  # 4) Standalone containers: optional best-effort recreate.
   local -a standalone=()
   for i in "${sel[@]}"; do [[ "${U_CAT[$i]}" == "standalone" ]] && standalone+=("$i"); done
   if [[ ${#standalone[@]} -gt 0 ]]; then
     echo
-    warn "Standalone containers were created with 'docker run'. The new image is pulled,"
-    warn "but the container must be recreated to use it."
-    printf 'Recreate %d standalone container(s) now? (best-effort) [y/N] ' "${#standalone[@]}"
+    ui_warn "Standalone containers were created with 'docker run'. The new image is pulled,"
+    ui_warn "but the container must be recreated to use it."
+    printf '%s  ❯%s Recreate %d standalone container(s) now? (best-effort) %s[y/N]%s ' \
+      "$C_ACCENT$C_BOLD" "$C_RESET" "${#standalone[@]}" "$C_GREY" "$C_RESET"
     read -r rec
     if [[ "${rec,,}" == "y" ]]; then
       if ensure_runlike; then
         for i in "${standalone[@]}"; do
-          info "Recreating ${C_BOLD}${U_CONTAINER[$i]}${C_RESET}"
+          ui_info "Recreating ${C_BOLD}${U_CONTAINER[$i]}${C_RESET}"
           recreate_standalone "${U_CONTAINER[$i]}"
         done
       else
-        warn "Could not obtain the runlike helper; recreate the containers manually."
+        ui_warn "Could not obtain the runlike helper; recreate the containers manually."
       fi
     else
       echo "  ${C_DIM}Left as-is. Recreate them yourself to apply the new image.${C_RESET}"
@@ -557,65 +527,42 @@ apply_updates() {
   fi
 
   echo
-  printf 'Remove old dangling images to reclaim space? [y/N] '
+  printf '%s  ❯%s Remove old dangling images to reclaim space? %s[y/N]%s ' "$C_ACCENT$C_BOLD" "$C_RESET" "$C_GREY" "$C_RESET"
   read -r prune
   if [[ "${prune,,}" == "y" ]]; then
-    docker image prune -f >/dev/null && ok "Pruned dangling images."
+    docker image prune -f >/dev/null && ui_ok "Pruned dangling images."
   fi
   echo
-  ok "Done."
-}
-
-usage() {
-  cat <<EOF
-${C_BOLD}Docker Updater${C_RESET}
-
-Usage: $(basename "$0") [DIRECTORY]
-
-Scans DIRECTORY (recursively) for docker-compose.yml / compose.yml files and
-also enumerates running containers deployed elsewhere (other compose files,
-Portainer / external stacks, plain docker run). Checks every image for a newer
-registry version and lets you interactively pick which ones to update.
-
-The search root is resolved in this order:
-  1. DIRECTORY argument
-  2. COMPOSE_ROOT environment variable
-  3. COMPOSE_ROOT set at the top of this script (currently: ${COMPOSE_ROOT:-auto})
-  4. Auto-detected: <your home>/${COMPOSE_SUBDIR:-docker}  (e.g. $(user_home)/${COMPOSE_SUBDIR:-docker})
-If none point to a real directory you will be prompted (default: current dir).
-EOF
+  ui_ok "Done."
 }
 
 main() {
-  case "${1:-}" in -h|--help) usage; exit 0 ;; esac
   require_deps
 
-  # Resolve the search root:
-  #   CLI arg > COMPOSE_ROOT (env/config) > auto-detected <home>/<subdir> > prompt.
   local root="${1:-${COMPOSE_ROOT:-}}"
   if [[ -z "$root" ]]; then
     root="$(user_home)/${COMPOSE_SUBDIR:-docker}"
-    info "Auto-detected compose path: ${C_BOLD}$root${C_RESET}"
+    ui_info "Auto-detected compose path: ${C_BOLD}$root${C_RESET}"
   fi
   if [[ -n "$root" && ! -d "$root" ]]; then
-    warn "Compose path does not exist: $root"
+    ui_warn "Compose path does not exist: $root"
     root=""
   fi
   if [[ -z "$root" ]]; then
-    printf 'Directory to scan for compose files [.]: '
+    printf '%s  ❯%s Directory to scan for compose files %s[.]%s: ' "$C_ACCENT$C_BOLD" "$C_RESET" "$C_GREY" "$C_RESET"
     read -r root
     root="${root:-.}"
   fi
   root="${root%/}"
   [[ -d "$root" ]] || die "Not a directory: $root"
-  info "Using compose path: ${C_BOLD}$root${C_RESET}"
+  ui_info "Using compose path: ${C_BOLD}$root${C_RESET}"
 
   build_container_index
   collect_compose "$root"
   collect_containers
 
   if [[ ${#U_IMAGE[@]} -eq 0 ]]; then
-    ok "Everything is already up to date. 🎉"
+    ui_ok "Everything is already up to date."
     exit 0
   fi
 
@@ -625,7 +572,7 @@ main() {
     apply_updates
   else
     clear
-    warn "Quit — no images were updated."
+    ui_warn "Quit — no images were updated."
   fi
 }
 
