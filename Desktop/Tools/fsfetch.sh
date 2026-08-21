@@ -65,6 +65,18 @@ fastfetch --gen-config "$USER_HOME/.config/fastfetch/config.jsonc" || { ui_err "
 
 rm -f "$USER_HOME/.config/fastfetch/config.jsonc"
 
-wget https://raw.githubusercontent.com/harilvfs/fastfetch/refs/heads/old-days/fastfetch/config.jsonc -O "$USER_HOME/.config/fastfetch/config.jsonc" || { ui_err "Could not download config file"; exit 1; }
+wget https://raw.githubusercontent.com/GamerX27/X27-Fastfetch-Config/main/fastfetch/config.jsonc -O "$USER_HOME/.config/fastfetch/config.jsonc" || { ui_err "Could not download config file"; exit 1; }
+
+ui_info "Installing Symbols Nerd Font Mono (icon fallback font)..."
+
+mkdir -p "$USER_HOME/.local/share/fonts" || { ui_err "Could not create fonts directory"; exit 1; }
+
+wget -q https://github.com/ryanoasis/nerd-fonts/releases/latest/download/NerdFontsSymbolsOnly.tar.xz -O /tmp/NerdFontsSymbolsOnly.tar.xz || { ui_err "Could not download Nerd Font symbols pack"; exit 1; }
+
+tar -xf /tmp/NerdFontsSymbolsOnly.tar.xz -C "$USER_HOME/.local/share/fonts" SymbolsNerdFontMono-Regular.ttf || { ui_err "Could not extract Nerd Font symbols pack"; exit 1; }
+
+rm -f /tmp/NerdFontsSymbolsOnly.tar.xz
+
+fc-cache -f "$USER_HOME/.local/share/fonts" >/dev/null 2>&1
 
 ui_ok "Close your terminal and reopen it to see the changes."
