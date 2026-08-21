@@ -61,10 +61,6 @@ detect_user
 
 mkdir -p "$USER_HOME/.config/fastfetch" || { ui_err "Could not navigate or create directory"; exit 1; }
 
-fastfetch --gen-config "$USER_HOME/.config/fastfetch/config.jsonc" || { ui_err "Could not generate default config"; exit 1; }
-
-rm -f "$USER_HOME/.config/fastfetch/config.jsonc"
-
 wget https://raw.githubusercontent.com/GamerX27/X27-Fastfetch-Config/main/fastfetch/config.jsonc -O "$USER_HOME/.config/fastfetch/config.jsonc" || { ui_err "Could not download config file"; exit 1; }
 
 ui_info "Installing Symbols Nerd Font Mono (icon fallback font)..."
