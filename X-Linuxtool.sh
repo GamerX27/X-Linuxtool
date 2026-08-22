@@ -311,7 +311,6 @@ check_and_install_dependencies() {
 
     if [ ${#missing_deps[@]} -ne 0 ]; then
         ui_warn "Missing: ${missing_deps[*]} — installing via $pkg_manager…"
-        sudo $pkg_manager update -y
         sudo $pkg_manager install -y "${missing_deps[@]}"
         if [ $? -eq 0 ]; then
             ui_ok "Dependencies installed successfully."
