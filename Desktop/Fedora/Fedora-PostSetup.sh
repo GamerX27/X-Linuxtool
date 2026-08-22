@@ -142,7 +142,7 @@ while true; do
     sudo -n true
     sleep 60
     kill -0 "$$" 2>/dev/null || exit
-done 2>/dev/null &
+done < /dev/null &> /dev/null &
 SUDO_KEEPALIVE_PID=$!
 
 cleanup() {
