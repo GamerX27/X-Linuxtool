@@ -11,7 +11,7 @@ set -uo pipefail
     [ -t 1 ] && echo "stdout is a tty" || echo "stdout is NOT a tty"
     echo "TERM=${TERM:-<unset>}"
     stty -a 2>&1
-} > /tmp/tty-debug.log 2>&1
+} > "$HOME/tty-debug.log" 2>&1
 
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
