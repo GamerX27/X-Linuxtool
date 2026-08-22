@@ -5,6 +5,12 @@
 
 set -uo pipefail
 
+# dnf only draws its live progress bar when stdout is a real tty; force one
+# via `script` so dnf's fancy output shows no matter what invoked us.
+if [ ! -t 1 ] && command -v script >/dev/null 2>&1; then
+    exec script -qefc "bash $(printf '%q' "$0")" /dev/null
+fi
+
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
     C_BOLD=$'\033[1m'
@@ -286,6 +292,29 @@ cat > ~/.local/share/kxmlgui5/konsole/sessionui.rc <<'EOF'
 EOF
 
 ok "Konsole configured: Fish is the default profile, all toolbars/tab bar hidden."
+
+log "Applying full dark mode and Papirus-Dark icons"
+KICKOFF_CFG="$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
+
+read -r cont applet < <(awk -F'[][]' '
+    /^\[Containments\]\[[0-9]+\]\[Applets\]\[[0-9]+\]$/ { c=$3; a=$6 }
+    /^plugin=org\.kde\.plasma\.kickoff$/ { print c, a; exit }
+' "$KICKOFF_CFG")
+
+plasma-apply-lookandfeel -a org.kde.breezedark.desktop \
+    && kwriteconfig6 --file kdeglobals --group Icons --key Theme Papirus-Dark \
+    && ok "Dark mode and Papirus-Dark icons applied." \
+    || warn "Failed to apply the dark theme (continuing)."
+
+# Papirus ships a Fedora-branded "start-here-fedora" launcher icon; the
+# theme changes above reset the launcher back to KDE's default, so reapply it.
+if [ -n "${cont:-}" ] && [ -n "${applet:-}" ]; then
+    kwriteconfig6 --file "$KICKOFF_CFG" \
+        --group Containments --group "$cont" --group Applets --group "$applet" \
+        --group Configuration --group General --key icon start-here-fedora
+fi
+
+kquitapp6 plasmashell 2>/dev/null && (kstart6 plasmashell >/dev/null 2>&1 &)
 
 log "Installing base applications"
 sudo dnf install -y vlc nextcloud-client easyeffects gnome-disk-utility libreoffice-writer gwenview \
