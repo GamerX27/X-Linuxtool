@@ -95,7 +95,6 @@ ui_err()     { printf '%s  ✖%s %s\n'   "$C_RED"    "$C_RESET" "$1" >&2; }
 ui_step()    { printf '\n%s  ➤ %s%s\n' "$C_MAGENTA$C_BOLD" "$1" "$C_RESET"; }
 
 ui_menu_item() {
-    # ui_menu_item <number> <icon> <label>
     printf '   %s%s)%s %s  %s%s%s\n' \
         "$C_ACCENT$C_BOLD" "$1" "$C_RESET" "$2" "$C_BOLD" "$3" "$C_RESET"
 }
@@ -247,7 +246,6 @@ fi
 export X27_LOCAL_ROOT="$LOCAL_ROOT"
 
 _download() {
-    # _download <url> <output-file>
     if command -v curl >/dev/null 2>&1; then
         curl -fsSL "$1" -o "$2"
     elif command -v wget >/dev/null 2>&1; then
@@ -259,7 +257,6 @@ _download() {
 }
 
 fetch_file() {
-    # fetch_file <codeberg-url> <github-url> <output-file> [local-relative-path]
     local cb="$1" gh="$2" out="$3" local_rel="$4"
 
     if [ -n "$LOCAL_ROOT" ] && [ -n "$local_rel" ] && [ -f "$LOCAL_ROOT/$local_rel" ]; then

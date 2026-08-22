@@ -70,7 +70,6 @@ GITHUB_RAW="https://raw.githubusercontent.com/GamerX27/X-Linuxtool/main/Desktop"
 LOCAL_BASE="${X27_LOCAL_ROOT:+$X27_LOCAL_ROOT/Desktop}"
 
 _download() {
-    # _download <url> <output-file>
     if command -v curl >/dev/null 2>&1; then
         curl -fsSL "$1" -o "$2"
     elif command -v wget >/dev/null 2>&1; then
@@ -82,7 +81,6 @@ _download() {
 }
 
 fetch_repo_file() {
-    # fetch_repo_file <relative/path> <output-file>
     local rel="$1" out="$2"
 
     if [ -n "$LOCAL_BASE" ] && [ -f "$LOCAL_BASE/$rel" ]; then
