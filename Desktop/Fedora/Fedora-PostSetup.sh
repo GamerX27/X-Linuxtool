@@ -5,13 +5,6 @@
 
 set -uo pipefail
 
-# When invoked through the X-Linuxtool.sh menu chain, stdout ends up not a
-# real tty by the time this script runs, so dnf silently drops its live
-# progress bar. Re-exec under `script` to force a genuine pty.
-if [ ! -t 1 ] && command -v script >/dev/null 2>&1; then
-    exec script -qefc "bash $(printf '%q' "$0")" /dev/null
-fi
-
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
     C_BOLD=$'\033[1m'
