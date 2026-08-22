@@ -5,12 +5,6 @@
 
 set -uo pipefail
 
-# dnf only draws its live progress bar when stdout is a real tty; force one
-# via `script` so dnf's fancy output shows no matter what invoked us.
-if [ ! -t 1 ] && command -v script >/dev/null 2>&1; then
-    exec script -qefc "bash $(printf '%q' "$0")" /dev/null
-fi
-
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
     C_BOLD=$'\033[1m'
@@ -296,9 +290,9 @@ ok "Konsole configured: Fish is the default profile, all toolbars/tab bar hidden
 log "Applying full dark mode and Papirus-Dark icons"
 KICKOFF_CFG="$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc"
 
-read -r cont applet < <(awk -F'[][]' '
-    /^\[Containments\]\[[0-9]+\]\[Applets\]\[[0-9]+\]$/ { c=$3; a=$6 }
-    /^plugin=org\.kde\.plasma\.kickoff$/ { print c, a; exit }
+read -r cont applet < <(awk '
+    /^\[Containments\]\[[0-9]+\]\[Applets\]\[[0-9]+\]$/ { path = $0; gsub(/[^0-9]/, " ", path) }
+    /^plugin=org\.kde\.plasma\.kickoff$/ { print path; exit }
 ' "$KICKOFF_CFG")
 
 plasma-apply-lookandfeel -a org.kde.breezedark.desktop \
