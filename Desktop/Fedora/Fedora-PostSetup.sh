@@ -5,13 +5,12 @@
 
 set -uo pipefail
 
-{
-    echo "--- tty debug $(date) ---"
-    [ -t 0 ] && echo "stdin is a tty" || echo "stdin is NOT a tty"
-    [ -t 1 ] && echo "stdout is a tty" || echo "stdout is NOT a tty"
-    echo "TERM=${TERM:-<unset>}"
-    stty -a 2>&1
-} > "$HOME/tty-debug.log" 2>&1
+# When invoked through the X-Linuxtool.sh menu chain, stdout ends up not a
+# real tty by the time this script runs, so dnf silently drops its live
+# progress bar. Re-exec under `script` to force a genuine pty.
+if [ ! -t 1 ] && command -v script >/dev/null 2>&1; then
+    exec script -qefc "bash $(printf '%q' "$0")" /dev/null
+fi
 
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
