@@ -66,6 +66,10 @@ require_root() {
   fi
 }
 
+installation_exists() {
+  [[ -f /etc/cron.d/os_auto_update ]] || [[ -f /usr/local/sbin/os_update.sh ]]
+}
+
 reset_existing_installation() {
   local removed=0
   local paths=(
@@ -565,6 +569,20 @@ maybe_offer_run() {
 
 main() {
   require_root
+
+  if installation_exists; then
+    ui_step "Existing Installation Detected"
+    ui_prompt "Just update the updater script and keep your current schedule/Gotify config? [Y/n] "
+    read -r UPDATE_ONLY_ANS || true
+    if [[ "${UPDATE_ONLY_ANS,,}" != "n" ]]; then
+      install_updater_script
+      install_update_command
+      ui_ok "Updater script refreshed; existing cron schedule and Gotify config left untouched."
+      maybe_offer_run
+      return 0
+    fi
+  fi
+
   reset_existing_installation
   install_updater_script
   install_update_command
