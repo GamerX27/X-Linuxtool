@@ -201,9 +201,22 @@ update_debian() {
   apt-get -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" dist-upgrade
   apt-get -y autoremove --purge
   apt-get -y autoclean
-  if [[ "${AUTO_REBOOT:-0}" == "1" ]] && [[ -f /var/run/reboot-required ]]; then
-    echo "[INFO] Reboot required. Rebooting in 1 minute..."
-    /sbin/shutdown -r +1 "Auto-reboot after updates"
+  if [[ "${AUTO_REBOOT:-0}" == "1" ]]; then
+    local reboot_needed=0
+    if [[ -f /var/run/reboot-required ]]; then
+      reboot_needed=1
+    else
+      # update-notifier-common (source of reboot-required) isn't installed by
+      # default on plain Debian, so fall back to comparing the running kernel
+      # against the newest installed kernel package.
+      local latest_kernel
+      latest_kernel=$(dpkg-query -W -f='${Package}\n' 'linux-image-[0-9]*' 2>/dev/null | sed 's/^linux-image-//' | sort -V | tail -n1)
+      [[ -n "$latest_kernel" && "$latest_kernel" != "$(uname -r)" ]] && reboot_needed=1
+    fi
+    if (( reboot_needed )); then
+      echo "[INFO] Reboot required. Rebooting in 1 minute..."
+      /sbin/shutdown -r +1 "Auto-reboot after updates"
+    fi
   fi
   echo "[INFO] Debian/Ubuntu update complete."
 }
@@ -222,8 +235,19 @@ update_rhel() {
     dnf -y upgrade --refresh || dnf -y distro-sync --refresh
     dnf -y autoremove || true
     dnf -y clean all || true
-    if [[ "${AUTO_REBOOT:-0}" == "1" ]] && is_cmd needs-restarting; then
-      if ! needs-restarting -r >/dev/null 2>&1; then
+    if [[ "${AUTO_REBOOT:-0}" == "1" ]]; then
+      local reboot_needed=0
+      if is_cmd needs-restarting; then
+        needs-restarting -r >/dev/null 2>&1 || reboot_needed=1
+      else
+        # dnf-utils (source of needs-restarting) isn't installed by default,
+        # so fall back to comparing the running kernel against the newest
+        # installed kernel package.
+        local latest_kernel
+        latest_kernel=$(rpm -q kernel-core --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' 2>/dev/null | sort -V | tail -n1)
+        [[ -n "$latest_kernel" && "$latest_kernel" != "$(uname -r)" ]] && reboot_needed=1
+      fi
+      if (( reboot_needed )); then
         echo "[INFO] Reboot required. Rebooting in 1 minute..."
         /sbin/shutdown -r +1 "Auto-reboot after updates"
       fi
@@ -241,8 +265,19 @@ update_rhel() {
     yum -y update
     yum -y autoremove || true
     yum -y clean all || true
-    if [[ "${AUTO_REBOOT:-0}" == "1" ]] && is_cmd needs-restarting; then
-      if ! needs-restarting -r >/dev/null 2>&1; then
+    if [[ "${AUTO_REBOOT:-0}" == "1" ]]; then
+      local reboot_needed=0
+      if is_cmd needs-restarting; then
+        needs-restarting -r >/dev/null 2>&1 || reboot_needed=1
+      else
+        # dnf-utils (source of needs-restarting) isn't installed by default,
+        # so fall back to comparing the running kernel against the newest
+        # installed kernel package.
+        local latest_kernel
+        latest_kernel=$(rpm -q kernel-core --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' 2>/dev/null | sort -V | tail -n1)
+        [[ -n "$latest_kernel" && "$latest_kernel" != "$(uname -r)" ]] && reboot_needed=1
+      fi
+      if (( reboot_needed )); then
         echo "[INFO] Reboot required. Rebooting in 1 minute..."
         /sbin/shutdown -r +1 "Auto-reboot after updates"
       fi
