@@ -1,5 +1,11 @@
 #!/bin/bash
 
+if [ -r /dev/tty ]; then
+    INPUT=/dev/tty
+else
+    INPUT=/dev/stdin
+fi
+
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
     C_BOLD=$'\033[1m'
@@ -7,29 +13,23 @@ if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
 
     case "${TERM:-}" in
         linux|screen|screen-*|tmux-*)
-            C_GREY=$'\033[38;5;244m'    # nord3  4c566a
-            C_FG=$'\033[38;5;253m'      # nord4  d8dee9
             C_BLUE=$'\033[38;5;110m'    # nord9  81a1c1
             C_RED=$'\033[38;5;167m'     # nord11 bf616a
             C_YELLOW=$'\033[38;5;222m'  # nord13 ebcb8b
             C_GREEN=$'\033[38;5;150m'   # nord14 a3be8c
             C_MAGENTA=$'\033[38;5;139m' # nord15 b48ead
-            C_ACCENT=$'\033[38;5;167m'  # nord11 bf616a
             ;;
         *)
-            C_GREY=$'\033[38;2;76;86;106m'     # nord3  4c566a
-            C_FG=$'\033[38;2;216;222;233m'     # nord4  d8dee9
             C_BLUE=$'\033[38;2;129;161;193m'   # nord9  81a1c1
             C_RED=$'\033[38;2;191;97;106m'     # nord11 bf616a
             C_YELLOW=$'\033[38;2;235;203;139m' # nord13 ebcb8b
             C_GREEN=$'\033[38;2;163;190;140m'  # nord14 a3be8c
             C_MAGENTA=$'\033[38;2;180;142;173m' # nord15 b48ead
-            C_ACCENT=$'\033[38;2;191;97;106m'  # nord11 bf616a
             ;;
     esac
 else
     C_RESET="" C_BOLD="" C_DIM=""
-    C_GREY="" C_FG="" C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_MAGENTA="" C_ACCENT=""
+    C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_MAGENTA=""
 fi
 
 ui_info()    { printf '%s  ›%s %s\n'   "$C_BLUE"   "$C_RESET" "$1"; }
@@ -37,13 +37,12 @@ ui_ok()      { printf '%s  ✔%s %s\n'   "$C_GREEN"  "$C_RESET" "$1"; }
 ui_warn()    { printf '%s  ▲%s %s\n'   "$C_YELLOW" "$C_RESET" "$1"; }
 ui_err()     { printf '%s  ✖%s %s\n'   "$C_RED"    "$C_RESET" "$1" >&2; }
 ui_step()    { printf '\n%s  ➤ %s%s\n' "$C_MAGENTA$C_BOLD" "$1" "$C_RESET"; }
-ui_rule()    { printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM$C_GREY" "$C_RESET"; }
+ui_rule()    { printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM" "$C_RESET"; }
 
 ui_menu_item() {
-    printf '   %s%s)%s %s%s%s  %s%s%s\n' \
-        "$C_ACCENT$C_BOLD" "$1" "$C_RESET" \
-        "$C_BOLD" "$2" "$C_RESET" \
-        "$C_GREY$C_DIM" "$3" "$C_RESET"
+    printf '   %s%s)%s %s%s%s\n' \
+        "$C_BOLD" "$1" "$C_RESET" \
+        "$C_BOLD" "$2" "$C_RESET"
 }
 
 CODEBERG_RAW="https://codeberg.org/X27/X-Linuxtool/raw/branch/main/Homelab"
@@ -92,12 +91,12 @@ while true; do
     clear 2>/dev/null
     ui_step "HomeLab"
     ui_rule
-    ui_menu_item 1 "Install Docker" "Install Docker CE and add your user to the docker group"
-    ui_menu_item 2 "Auto Update setup" "Set up automatic OS/package updates"
-    ui_menu_item 3 "Docker Compose Updater" "Update running Docker Compose stacks"
-    ui_menu_item 0 "Back" "Return to the main menu"
-    printf '%s  ❯%s Enter your choice %s[0-3]%s: ' "$C_ACCENT$C_BOLD" "$C_RESET" "$C_GREY" "$C_RESET"
-    read choice || exit 0
+    ui_menu_item 1 "Install Docker"
+    ui_menu_item 2 "Auto Update setup"
+    ui_menu_item 3 "Docker Compose Updater"
+    ui_menu_item 0 "Back"
+    printf '%s  ❯%s Enter your choice [0-3]: ' "$C_BOLD" "$C_RESET"
+    read -r choice < "$INPUT" || exit 0
 
     case $choice in
         0)
@@ -128,7 +127,7 @@ while true; do
     esac
 
     printf '\n'
-    printf '%s  ❯%s Press Enter to return to this menu…%s ' "$C_ACCENT$C_BOLD" "$C_RESET" "$C_GREY"
-    read -r _
+    printf '%s  ❯%s Press Enter to return to this menu… ' "$C_BOLD" "$C_RESET"
+    read -r _ < "$INPUT"
     printf '%s' "$C_RESET"
 done

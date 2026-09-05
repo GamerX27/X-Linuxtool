@@ -10,35 +10,29 @@ if [[ -t 1 ]] && [[ "${TERM:-dumb}" != "dumb" ]] && [[ -z "${NO_COLOR:-}" ]]; th
   C_RESET=$'\e[0m'; C_BOLD=$'\e[1m'; C_DIM=$'\e[2m'
   case "${TERM:-}" in
     linux|screen|screen-*|tmux-*)
-      C_GREY=$'\e[38;5;244m'     # nord3  4c566a
-      C_FG=$'\e[38;5;253m'       # nord4  d8dee9
       C_CYAN=$'\e[38;5;116m'     # nord8  88c0d0
       C_BLUE=$'\e[38;5;110m'     # nord9  81a1c1
       C_RED=$'\e[38;5;167m'      # nord11 bf616a
       C_YELLOW=$'\e[38;5;222m'   # nord13 ebcb8b
       C_GREEN=$'\e[38;5;150m'    # nord14 a3be8c
       C_MAGENTA=$'\e[38;5;139m'  # nord15 b48ead
-      C_ACCENT=$'\e[38;5;167m'   # nord11 bf616a
       BG_ACCENT=$'\e[48;5;167m'  # nord11 bf616a
       FG_ONACCENT=$'\e[38;5;236m' # nord0  2e3440
       ;;
     *)
-      C_GREY=$'\e[38;2;76;86;106m'      # nord3  4c566a
-      C_FG=$'\e[38;2;216;222;233m'      # nord4  d8dee9
       C_CYAN=$'\e[38;2;136;192;208m'    # nord8  88c0d0
       C_BLUE=$'\e[38;2;129;161;193m'    # nord9  81a1c1
       C_RED=$'\e[38;2;191;97;106m'      # nord11 bf616a
       C_YELLOW=$'\e[38;2;235;203;139m'  # nord13 ebcb8b
       C_GREEN=$'\e[38;2;163;190;140m'   # nord14 a3be8c
       C_MAGENTA=$'\e[38;2;180;142;173m' # nord15 b48ead
-      C_ACCENT=$'\e[38;2;191;97;106m'   # nord11 bf616a
       BG_ACCENT=$'\e[48;2;191;97;106m'  # nord11 bf616a
       FG_ONACCENT=$'\e[38;2;46;52;64m'  # nord0  2e3440
       ;;
   esac
 else
-  C_RESET="" C_BOLD="" C_DIM="" C_GREY="" C_FG=""
-  C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_CYAN="" C_MAGENTA="" C_ACCENT=""
+  C_RESET="" C_BOLD="" C_DIM=""
+  C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_CYAN="" C_MAGENTA=""
   BG_ACCENT="" FG_ONACCENT=""
 fi
 
@@ -52,7 +46,7 @@ ui_ok()    { printf '%s  ✔%s %s\n'   "$C_GREEN"  "$C_RESET" "$1"; }
 ui_warn()  { printf '%s  ▲%s %s\n'   "$C_YELLOW" "$C_RESET" "$1"; }
 ui_err()   { printf '%s  ✖%s %s\n'   "$C_RED"    "$C_RESET" "$1" >&2; }
 ui_step()  { printf '\n%s  ➤ %s%s\n' "$C_MAGENTA$C_BOLD" "$1" "$C_RESET"; }
-ui_rule()  { printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM$C_GREY" "$C_RESET"; }
+ui_rule()  { printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM" "$C_RESET"; }
 die()      { ui_err "$*"; exit 1; }
 have()     { command -v "$1" >/dev/null 2>&1; }
 
@@ -345,18 +339,18 @@ draw_menu() {
   local cursor="$1"
   local NAME_W=22 IMG_W=40 SRC_W=14
   clear
-  echo "${C_GREY}${C_BOLD}╔════════════════════════════════════════════════════════════════════════╗${C_RESET}"
-  echo "${C_GREY}${C_BOLD}║${C_RESET}  ${C_ACCENT}${C_BOLD}Docker Updater${C_RESET}  ${C_DIM}${C_GREY}— choose which images to update${C_RESET}                        ${C_GREY}${C_BOLD}║${C_RESET}"
-  echo "${C_GREY}${C_BOLD}╚════════════════════════════════════════════════════════════════════════╝${C_RESET}"
+  echo "${C_BOLD}╔════════════════════════════════════════════════════════════════════════╗${C_RESET}"
+  echo "${C_BOLD}║${C_RESET}  ${C_BOLD}Docker Updater${C_RESET}  ${C_DIM}— choose which images to update${C_RESET}                        ${C_BOLD}║${C_RESET}"
+  echo "${C_BOLD}╚════════════════════════════════════════════════════════════════════════╝${C_RESET}"
   echo
-  echo "  ${C_ACCENT}${C_BOLD}↑/↓${C_RESET} move    ${C_ACCENT}${C_BOLD}Space${C_RESET} toggle    ${C_ACCENT}${C_BOLD}a${C_RESET} all    ${C_GREEN}${C_BOLD}Enter${C_RESET} update    ${C_ACCENT}${C_BOLD}q / Ctrl+C${C_RESET} quit"
+  echo "  ${C_BOLD}↑/↓${C_RESET} move    ${C_BOLD}Space${C_RESET} toggle    ${C_BOLD}a${C_RESET} all    ${C_GREEN}${C_BOLD}Enter${C_RESET} update    ${C_BOLD}q / Ctrl+C${C_RESET} quit"
 
   local count=0 i
   for i in "${!U_IMAGE[@]}"; do [[ "${U_SEL[$i]}" == "1" ]] && ((count++)); done
 
   echo
   printf '    %-4s %-8s %-*s %-*s %s\n' "SEL" "STATE" "$NAME_W" "CONTAINER" "$IMG_W" "IMAGE" "SOURCE"
-  printf '    %s\n' "${C_DIM}${C_GREY}────────────────────────────────────────────────────────────────────────────────${C_RESET}"
+  printf '    %s\n' "${C_DIM}────────────────────────────────────────────────────────────────────────────────${C_RESET}"
 
   local last_cat=""
   for i in "${!U_IMAGE[@]}"; do
@@ -477,7 +471,7 @@ apply_updates() {
     echo "    ${CHECK} ${U_IMAGE[$i]}  ${C_DIM}${origin}${C_RESET}"
   done
   echo
-  printf '%s  ❯%s Proceed? %s[y/N]%s ' "$C_ACCENT$C_BOLD" "$C_RESET" "$C_GREY" "$C_RESET"
+  printf '%s  ❯%s Proceed? [y/N] ' "$C_BOLD" "$C_RESET"
   read -r ans
   [[ "${ans,,}" == "y" ]] || { ui_warn "Aborted by user."; return 0; }
   echo
@@ -516,8 +510,8 @@ apply_updates() {
     echo
     ui_warn "Standalone containers were created with 'docker run'. The new image is pulled,"
     ui_warn "but the container must be recreated to use it."
-    printf '%s  ❯%s Recreate %d standalone container(s) now? (best-effort) %s[y/N]%s ' \
-      "$C_ACCENT$C_BOLD" "$C_RESET" "${#standalone[@]}" "$C_GREY" "$C_RESET"
+    printf '%s  ❯%s Recreate %d standalone container(s) now? (best-effort) [y/N] ' \
+      "$C_BOLD" "$C_RESET" "${#standalone[@]}"
     read -r rec
     if [[ "${rec,,}" == "y" ]]; then
       if ensure_runlike; then
@@ -534,7 +528,7 @@ apply_updates() {
   fi
 
   echo
-  printf '%s  ❯%s Remove old dangling images to reclaim space? %s[y/N]%s ' "$C_ACCENT$C_BOLD" "$C_RESET" "$C_GREY" "$C_RESET"
+  printf '%s  ❯%s Remove old dangling images to reclaim space? [y/N] ' "$C_BOLD" "$C_RESET"
   read -r prune
   if [[ "${prune,,}" == "y" ]]; then
     docker image prune -f >/dev/null && ui_ok "Pruned dangling images."
@@ -556,7 +550,7 @@ main() {
     root=""
   fi
   if [[ -z "$root" ]]; then
-    printf '%s  ❯%s Directory to scan for compose files %s[.]%s: ' "$C_ACCENT$C_BOLD" "$C_RESET" "$C_GREY" "$C_RESET"
+    printf '%s  ❯%s Directory to scan for compose files [.]: ' "$C_BOLD" "$C_RESET"
     read -r root
     root="${root:-.}"
   fi

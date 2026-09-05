@@ -29,27 +29,23 @@ if [[ -t 1 ]] && [[ "${TERM:-dumb}" != "dumb" ]] && [[ -z "${NO_COLOR:-}" ]]; th
   case "${TERM:-}" in
     linux|screen|screen-*|tmux-*)
       # Nearest 256-color approximations of the Nord palette.
-      C_GREY=$'\e[38;5;244m'    # nord3  4c566a
       C_BLUE=$'\e[38;5;110m'    # nord9  81a1c1
       C_RED=$'\e[38;5;167m'     # nord11 bf616a
       C_YELLOW=$'\e[38;5;222m'  # nord13 ebcb8b
       C_GREEN=$'\e[38;5;150m'   # nord14 a3be8c
       C_MAGENTA=$'\e[38;5;139m' # nord15 b48ead
-      C_ACCENT=$'\e[38;5;167m'  # nord11 bf616a
       ;;
     *)
-      C_GREY=$'\e[38;2;76;86;106m'     # nord3  4c566a
       C_BLUE=$'\e[38;2;129;161;193m'   # nord9  81a1c1
       C_RED=$'\e[38;2;191;97;106m'     # nord11 bf616a
       C_YELLOW=$'\e[38;2;235;203;139m' # nord13 ebcb8b
       C_GREEN=$'\e[38;2;163;190;140m'  # nord14 a3be8c
       C_MAGENTA=$'\e[38;2;180;142;173m' # nord15 b48ead
-      C_ACCENT=$'\e[38;2;191;97;106m'  # nord11 bf616a
       ;;
   esac
 else
   C_RESET="" C_BOLD="" C_DIM=""
-  C_GREY="" C_BLUE="" C_RED="" C_YELLOW="" C_GREEN="" C_MAGENTA="" C_ACCENT=""
+  C_BLUE="" C_RED="" C_YELLOW="" C_GREEN="" C_MAGENTA=""
 fi
 
 ui_info()    { printf '%s  ›%s %s\n'   "$C_BLUE"   "$C_RESET" "$1"; }
@@ -57,7 +53,7 @@ ui_ok()      { printf '%s  ✔%s %s\n'   "$C_GREEN"  "$C_RESET" "$1"; }
 ui_warn()    { printf '%s  ▲%s %s\n'   "$C_YELLOW" "$C_RESET" "$1"; }
 ui_err()     { printf '%s  ✖%s %s\n'   "$C_RED"    "$C_RESET" "$1" >&2; }
 ui_step()    { printf '\n%s  ➤ %s%s\n' "$C_MAGENTA$C_BOLD" "$1" "$C_RESET"; }
-ui_prompt()  { printf '%s%s%s' "$C_ACCENT$C_BOLD" "$1" "$C_RESET"; }
+ui_prompt()  { printf '%s%s%s' "$C_BOLD" "$1" "$C_RESET"; }
 
 require_root() {
   if [[ $EUID -ne 0 ]]; then

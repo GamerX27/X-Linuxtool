@@ -13,29 +13,23 @@ if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     case "${TERM:-}" in
         linux|screen|screen-*|tmux-*)
             # Nearest 256-color approximations of the Nord palette.
-            C_GREY=$'\033[38;5;244m'    # nord3  4c566a
-            C_FG=$'\033[38;5;253m'      # nord4  d8dee9
             C_BLUE=$'\033[38;5;110m'    # nord9  81a1c1
             C_RED=$'\033[38;5;167m'     # nord11 bf616a
             C_YELLOW=$'\033[38;5;222m'  # nord13 ebcb8b
             C_GREEN=$'\033[38;5;150m'   # nord14 a3be8c
             C_MAGENTA=$'\033[38;5;139m' # nord15 b48ead
-            C_ACCENT=$'\033[38;5;167m'  # nord11 bf616a
             ;;
         *)
-            C_GREY=$'\033[38;2;76;86;106m'     # nord3  4c566a
-            C_FG=$'\033[38;2;216;222;233m'     # nord4  d8dee9
             C_BLUE=$'\033[38;2;129;161;193m'   # nord9  81a1c1
             C_RED=$'\033[38;2;191;97;106m'     # nord11 bf616a
             C_YELLOW=$'\033[38;2;235;203;139m' # nord13 ebcb8b
             C_GREEN=$'\033[38;2;163;190;140m'  # nord14 a3be8c
             C_MAGENTA=$'\033[38;2;180;142;173m' # nord15 b48ead
-            C_ACCENT=$'\033[38;2;191;97;106m'  # nord11 bf616a
             ;;
     esac
 else
     C_RESET="" C_BOLD="" C_DIM=""
-    C_GREY="" C_FG="" C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_MAGENTA="" C_ACCENT=""
+    C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_MAGENTA=""
 fi
 
 log() {
@@ -59,6 +53,44 @@ require_cmd() {
         err "Required command '$1' not found."
         exit 1
     fi
+}
+
+# run_step <description> <shell command string>
+# Runs a long-running command (dnf/flatpak/curl install, etc.) in the
+# background and draws our own spinner + elapsed time in front of it,
+# instead of relying on the command's own progress output — dnf's live
+# download bar depends on stdout being a real tty at the exact moment it
+# runs, which isn't reliable across every way this script gets launched
+# (curl | bash, nested dispatchers, etc.). The command's actual output is
+# captured and only shown if it fails, so a run still tells you what broke.
+run_step() {
+    local desc="$1" cmd="$2" logfile pid status i=0 elapsed start
+    logfile="$(mktemp /tmp/x27-step.XXXXXX.log)"
+    start=$(date +%s)
+
+    bash -c "$cmd" >"$logfile" 2>&1 &
+    pid=$!
+
+    local spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    while kill -0 "$pid" 2>/dev/null; do
+        elapsed=$(( $(date +%s) - start ))
+        i=$(( (i + 1) % ${#spin} ))
+        printf '\r%s%s%s %s (%ds) ' \
+            "$C_BLUE" "${spin:i:1}" "$C_RESET" "$desc" "$elapsed"
+        sleep 0.12
+    done
+    wait "$pid"
+    status=$?
+
+    printf '\r\033[K'
+    if [ "$status" -eq 0 ]; then
+        ok "$desc"
+    else
+        warn "${desc} — failed (exit ${status}, continuing)"
+        sed 's/^/    /' "$logfile" >&2
+    fi
+    rm -f "$logfile"
+    return "$status"
 }
 
 # Repository locations: Codeberg is primary, GitHub is a fallback mirror.
@@ -106,7 +138,7 @@ fetch_repo_file() {
 # Ask a yes/no question; returns 0 for yes, 1 for anything else (default no).
 ask_yes_no() {
     local prompt="$1" answer
-    printf '%s%s%s %s[y/N]%s: ' "$C_FG" "$prompt" "$C_RESET" "$C_GREY" "$C_RESET"
+    printf '%s [y/N]: ' "$prompt"
     read -r answer
     case "${answer}" in
         [yY] | [yY][eE][sS]) return 0 ;;
@@ -115,10 +147,7 @@ ask_yes_no() {
 }
 
 set_locale_time() {
-    log "Setting LC_TIME to C.UTF-8"
-    sudo localectl set-locale LC_TIME=C.UTF-8 \
-        && ok "Successfully set LC_TIME." \
-        || warn "Failed to set LC_TIME (continuing)."
+    run_step "Setting LC_TIME to C.UTF-8" "sudo localectl set-locale LC_TIME=C.UTF-8"
 }
 
 if [[ "${EUID}" -eq 0 ]]; then
@@ -152,88 +181,107 @@ FEDORA_VERSION="$(rpm -E %fedora)"
 log "Detected Fedora ${FEDORA_VERSION}"
 
 log "Refreshing metadata and upgrading the system"
-sudo dnf update --refresh -y \
-    && sudo dnf upgrade -y \
-    && ok "System updated." \
-    || warn "System update encountered issues (continuing)."
+run_step "Refreshing metadata" "sudo dnf update --refresh -y" \
+    && run_step "Upgrading system packages" "sudo dnf upgrade -y"
 
 log "Enabling RPM Fusion (free + nonfree) repositories"
-sudo dnf install -y \
-    "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${FEDORA_VERSION}.noarch.rpm" \
-    "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FEDORA_VERSION}.noarch.rpm" \
-    && ok "RPM Fusion enabled." \
-    || warn "Failed to enable RPM Fusion (continuing)."
+run_step "Enabling RPM Fusion" \
+    "sudo dnf install -y \
+        'https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-${FEDORA_VERSION}.noarch.rpm' \
+        'https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FEDORA_VERSION}.noarch.rpm'"
 
 log "Enabling the Cisco OpenH264 repository"
-sudo dnf config-manager setopt fedora-cisco-openh264.enabled=1 \
-    && ok "Cisco OpenH264 repository enabled." \
-    || warn "Failed to enable the Cisco OpenH264 repository (continuing)."
+run_step "Enabling Cisco OpenH264 repository" "sudo dnf config-manager setopt fedora-cisco-openh264.enabled=1"
 
 log "Updating the @core package group"
-sudo dnf update -y @core \
-    && ok "@core package group updated." \
-    || warn "Failed to update @core package group (continuing)."
+run_step "Updating @core package group" "sudo dnf update -y @core"
 
 log "Switching to the full ffmpeg build"
-sudo dnf swap ffmpeg-free ffmpeg --allowerasing -y \
-    && ok "Switched to the full ffmpeg build." \
-    || warn "Failed to switch to the full ffmpeg build (continuing)."
+run_step "Switching to full ffmpeg build" "sudo dnf swap ffmpeg-free ffmpeg --allowerasing -y"
 
 log "Installing additional multimedia codecs"
-sudo dnf update -y @multimedia --setopt="install_weak_deps=False" --exclude=PackageKit-gstreamer-plugin \
-    && ok "Multimedia codecs installed." \
-    || warn "Failed to install multimedia codecs (continuing)."
+run_step "Installing multimedia codecs" \
+    "sudo dnf update -y @multimedia --setopt='install_weak_deps=False' --exclude=PackageKit-gstreamer-plugin"
 
 log "Hardware-accelerated video codecs"
-printf '%sSelect your GPU vendor for hardware-accelerated (VA-API) codecs:%s\n' "$C_FG" "$C_RESET"
-printf '  %s1)%s Intel (recent - Broadwell/5th-gen and newer)\n' "$C_ACCENT$C_BOLD" "$C_RESET"
-printf '  %s2)%s Intel (older - pre-Broadwell)\n' "$C_ACCENT$C_BOLD" "$C_RESET"
-printf '  %s3)%s AMD\n' "$C_ACCENT$C_BOLD" "$C_RESET"
-printf '  %s4)%s Skip\n' "$C_ACCENT$C_BOLD" "$C_RESET"
-printf '%sEnter choice%s %s[1/2/3/4]%s: ' "$C_FG" "$C_RESET" "$C_GREY" "$C_RESET"
-read -r gpu_choice
 
-case "${gpu_choice}" in
-    1)
-        log "Installing Intel (recent) hardware-accelerated codecs"
-        sudo dnf install -y intel-media-driver \
-            && ok "Intel (recent) codecs installed." \
-            || warn "Failed to install Intel (recent) codecs (continuing)."
-        ;;
-    2)
-        log "Installing Intel (older) hardware-accelerated codecs"
-        sudo dnf install -y libva-intel-driver \
-            && ok "Intel (older) codecs installed." \
-            || warn "Failed to install Intel (older) codecs (continuing)."
-        ;;
-    3)
-        log "Installing AMD hardware-accelerated codecs"
-        sudo dnf install -y mesa-va-drivers-freeworld mesa-va-drivers-freeworld.i686 \
-            && ok "AMD codecs installed." \
-            || warn "Failed to install AMD codecs (continuing)."
-        ;;
-    *)
-        log "Skipping hardware-accelerated codec installation"
-        ;;
-esac
+# Detects vendor keywords across all VGA/3D controller lines rather than just
+# the first, so hybrid laptops (e.g. Intel iGPU + NVIDIA dGPU) still get the
+# iGPU codec driver instead of being misdetected as NVIDIA-only.
+detect_gpu_vendors() {
+    lspci -nnk 2>/dev/null \
+        | grep -Ei 'vga compatible controller|3d controller|display controller' \
+        | grep -oiE 'intel|amd|ati|nvidia' \
+        | tr '[:upper:]' '[:lower:]' \
+        | sort -u
+}
+
+# Intel model numbers encode generation: a 4-digit number's first digit is the
+# generation (gen 1-9), a 5-digit number's first two digits are (gen 10+).
+# intel-media-driver (iHD) targets Broadwell/gen5 and newer; older chips need
+# the legacy libva-intel-driver (i965).
+detect_intel_generation() {
+    local model
+    model="$(grep -m1 '^model name' /proc/cpuinfo)"
+    if [[ "$model" =~ i[3579]-([0-9]{4,5}) ]]; then
+        local num="${BASH_REMATCH[1]}"
+        if [[ ${#num} -eq 5 ]]; then
+            echo "${num:0:2}"
+        else
+            echo "${num:0:1}"
+        fi
+    fi
+}
+
+gpu_vendors="$(detect_gpu_vendors)"
+found_intel=0
+found_amd=0
+found_nvidia=0
+while read -r v; do
+    case "$v" in
+        intel) found_intel=1 ;;
+        amd | ati) found_amd=1 ;;
+        nvidia) found_nvidia=1 ;;
+    esac
+done <<< "$gpu_vendors"
+
+if [[ $found_intel -eq 1 ]]; then
+    intel_gen="$(detect_intel_generation)"
+    if [[ -n "$intel_gen" && "$intel_gen" -lt 5 ]]; then
+        log "Detected Intel GPU (pre-Broadwell, gen ${intel_gen})"
+        run_step "Installing Intel (older) codecs" "sudo dnf install -y libva-intel-driver"
+    else
+        log "Detected Intel GPU (Broadwell/5th-gen or newer)"
+        run_step "Installing Intel (recent) codecs" "sudo dnf install -y intel-media-driver"
+    fi
+fi
+
+if [[ $found_amd -eq 1 ]]; then
+    log "Detected AMD GPU"
+    run_step "Installing AMD codecs" "sudo dnf install -y mesa-va-drivers-freeworld mesa-va-drivers-freeworld.i686"
+fi
+
+if [[ $found_nvidia -eq 1 && $found_intel -eq 0 && $found_amd -eq 0 ]]; then
+    warn "Detected NVIDIA GPU only — hardware-accelerated codec install for NVIDIA isn't automated yet, skipping."
+fi
+
+if [[ $found_intel -eq 0 && $found_amd -eq 0 && $found_nvidia -eq 0 ]]; then
+    warn "Could not detect GPU vendor; skipping hardware-accelerated codec installation."
+fi
 
 log "Removing unwanted default applications"
-sudo dnf remove -y \
-    dragon juk elisa-player kmail khelpcenter kmahjongg kmines kpat firefox \
-    kaddressbook korganizer kolourpaint kamoso neochat 'libreoffice*' \
-    && ok "Unwanted default applications removed." \
-    || warn "Failed to remove some default applications (continuing)."
+run_step "Removing unwanted default applications" \
+    "sudo dnf remove -y \
+        dragon juk elisa-player kmail khelpcenter kmahjongg kmines kpat firefox \
+        kaddressbook korganizer kolourpaint kamoso neochat 'libreoffice*'"
 
 log "Installing base command-line tools"
 # Note: lspci ships in pciutils, sensors ships in lm_sensors.
-sudo dnf install -y wget fastfetch fish htop nano papirus-icon-theme curl pciutils lm_sensors \
-    && ok "Base command-line tools installed." \
-    || warn "Failed to install base command-line tools (continuing)."
+run_step "Installing base command-line tools" \
+    "sudo dnf install -y wget fastfetch fish htop nano papirus-icon-theme curl pciutils lm_sensors"
 
 log "Setting Fish as the default login shell"
-sudo chsh -s "$(command -v fish)" "$USER" \
-    && ok "Fish set as the default login shell." \
-    || warn "Failed to set Fish as the default login shell (continuing)."
+run_step "Setting Fish as the default login shell" "sudo chsh -s \"\$(command -v fish)\" \"$USER\""
 
 log "Configuring Konsole (Fish default profile, hidden toolbars)"
 mkdir -p ~/.local/share/konsole ~/.local/share/kxmlgui5/konsole
@@ -293,10 +341,8 @@ read -r cont applet < <(awk '
     /^plugin=org\.kde\.plasma\.kickoff$/ { print path; exit }
 ' "$KICKOFF_CFG")
 
-plasma-apply-lookandfeel -a org.kde.breezedark.desktop \
-    && kwriteconfig6 --file kdeglobals --group Icons --key Theme Papirus-Dark \
-    && ok "Dark mode and Papirus-Dark icons applied." \
-    || warn "Failed to apply the dark theme (continuing)."
+run_step "Applying dark mode and Papirus-Dark icons" \
+    "plasma-apply-lookandfeel -a org.kde.breezedark.desktop && kwriteconfig6 --file kdeglobals --group Icons --key Theme Papirus-Dark"
 
 # Papirus ships a Fedora-branded "start-here-fedora" launcher icon; the
 # theme changes above reset the launcher back to KDE's default, so reapply it.
@@ -309,9 +355,8 @@ fi
 kquitapp6 plasmashell 2>/dev/null && (kstart6 plasmashell >/dev/null 2>&1 &)
 
 log "Installing base applications"
-sudo dnf install -y vlc nextcloud-client easyeffects gnome-disk-utility libreoffice-writer gwenview \
-    && ok "Base applications installed." \
-    || warn "Failed to install base applications (continuing)."
+run_step "Installing base applications" \
+    "sudo dnf install -y vlc nextcloud-client easyeffects gnome-disk-utility libreoffice-writer gwenview"
 
 require_cmd flatpak
 
@@ -320,28 +365,21 @@ log "Adding the Flathub remote"
 # system-wide too. This needs root: the cached sudo session covers it without
 # triggering a polkit prompt (which would otherwise fail in a non-interactive
 # context with "ConfigureRemote not allowed for user").
-sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo \
-    && ok "Flathub remote added." \
-    || warn "Failed to add the Flathub remote (continuing)."
+run_step "Adding the Flathub remote" \
+    "sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo"
 
 log "Running the Flatpak app install script"
 FLATPAKS_SCRIPT="$(mktemp /tmp/flatpaks.XXXXXX.sh)"
 fetch_repo_file "Flatpak/flatpaks.sh" "${FLATPAKS_SCRIPT}"
-sudo bash "${FLATPAKS_SCRIPT}" \
-    && ok "Flatpak apps installed." \
-    || warn "Flatpak app install script reported issues (continuing)."
+run_step "Installing Flatpak apps" "sudo bash '${FLATPAKS_SCRIPT}'"
 rm -f "${FLATPAKS_SCRIPT}"
 
 log "Disabling the Fedora Flatpak remotes"
-sudo flatpak remote-modify fedora --disable
-sudo flatpak remote-modify fedora-testing --disable \
-    && ok "Fedora Flatpak remotes disabled." \
-    || warn "Failed to disable the Fedora Flatpak remotes (continuing)."
+run_step "Disabling Fedora Flatpak remotes" \
+    "sudo flatpak remote-modify fedora --disable && sudo flatpak remote-modify fedora-testing --disable"
 
 log "Installing Vivaldi (Flatpak)"
-sudo flatpak install -y flathub com.vivaldi.Vivaldi \
-    && ok "Vivaldi installed." \
-    || warn "Failed to install Vivaldi (continuing)."
+run_step "Installing Vivaldi" "sudo flatpak install -y flathub com.vivaldi.Vivaldi"
 
 log "Disabling the NetworkManager connectivity check"
 # An empty connectivity URI disables the check. We write the override to /etc
@@ -353,18 +391,14 @@ sudo tee /etc/NetworkManager/conf.d/20-connectivity-fedora.conf >/dev/null <<'EO
 uri=
 EOF
 
-sudo dnf remove -y NetworkManager-config-connectivity-fedora
-sudo systemctl restart NetworkManager \
-    && ok "NetworkManager connectivity check disabled." \
-    || warn "Failed to disable the NetworkManager connectivity check (continuing)."
+run_step "Disabling NetworkManager connectivity check" \
+    "sudo dnf remove -y NetworkManager-config-connectivity-fedora; sudo systemctl restart NetworkManager"
 
 log "Waiting 10 seconds for NetworkManager to settle"
 sleep 10
 
 log "Installing the Brave browser (origin flavor)"
-curl -fsS https://dl.brave.com/install.sh | FLAVOR=origin sh \
-    && ok "Brave browser installed." \
-    || warn "Failed to install the Brave browser (continuing)."
+run_step "Installing Brave browser" "curl -fsS https://dl.brave.com/install.sh | FLAVOR=origin sh"
 
 log "Setting Brave as the default web browser"
 xdg-settings set default-web-browser brave-origin.desktop \
@@ -374,31 +408,23 @@ xdg-settings set default-web-browser brave-origin.desktop \
 log "Applying Brave policy configuration"
 BRAVE_POLICY_SCRIPT="$(mktemp /tmp/make_brave_great_again.XXXXXX.sh)"
 fetch_repo_file "Browser/make_brave_great_again.sh" "${BRAVE_POLICY_SCRIPT}"
-sudo bash "${BRAVE_POLICY_SCRIPT}" \
-    && ok "Brave policy configuration applied." \
-    || warn "Failed to apply the Brave policy configuration (continuing)."
+run_step "Applying Brave policy configuration" "sudo bash '${BRAVE_POLICY_SCRIPT}'"
 rm -f "${BRAVE_POLICY_SCRIPT}"
 
 log "Installing LibreWolf"
 # --overwrite keeps this idempotent so re-running the script doesn't error out.
 sudo dnf config-manager addrepo --overwrite --from-repofile=https://repo.librewolf.net/librewolf.repo
-sudo dnf install -y librewolf \
-    && ok "LibreWolf installed." \
-    || warn "Failed to install LibreWolf (continuing)."
+run_step "Installing LibreWolf" "sudo dnf install -y librewolf"
 
 log "Installing additional browsers (Chromium, Tor Browser Launcher)"
-sudo dnf install -y chromium torbrowser-launcher \
-    && ok "Chromium and Tor Browser Launcher installed." \
-    || warn "Failed to install Chromium/Tor Browser Launcher (continuing)."
+run_step "Installing Chromium and Tor Browser Launcher" "sudo dnf install -y chromium torbrowser-launcher"
 
 log "Gaming setup"
 if ask_yes_no "Would you like to run the gaming setup script?"; then
     log "Running the gaming setup script"
     GAMING_SCRIPT="$(mktemp /tmp/Gaming.XXXXXX.sh)"
     fetch_repo_file "Gaming/Gaming.sh" "${GAMING_SCRIPT}"
-    sudo bash "${GAMING_SCRIPT}" \
-        && ok "Gaming setup complete." \
-        || warn "Gaming setup script reported issues (continuing)."
+    run_step "Running gaming setup script" "sudo bash '${GAMING_SCRIPT}'"
     rm -f "${GAMING_SCRIPT}"
 else
     log "Skipping gaming setup"
@@ -408,18 +434,13 @@ set_locale_time
 
 log "Zed editor"
 if ask_yes_no "Would you like to install the Zed editor?"; then
-    log "Installing the Zed editor"
-    curl -f https://zed.dev/install.sh | sh \
-        && ok "Zed editor installed." \
-        || warn "Failed to install the Zed editor (continuing)."
+    run_step "Installing Zed editor" "curl -f https://zed.dev/install.sh | sh"
 else
     log "Skipping Zed editor installation"
 fi
 
 log "Removing orphaned packages"
-sudo dnf autoremove -y \
-    && ok "Orphaned packages removed." \
-    || warn "Failed to remove orphaned packages (continuing)."
+run_step "Removing orphaned packages" "sudo dnf autoremove -y"
 
 log "Fedora post-setup complete."
 
