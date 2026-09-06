@@ -179,6 +179,7 @@ trap cleanup EXIT
 
 FEDORA_VERSION="$(rpm -E %fedora)"
 log "Detected Fedora ${FEDORA_VERSION}"
+log "This will take a while — sit back and let it run."
 
 log "Refreshing metadata and upgrading the system"
 run_step "Refreshing metadata" "sudo dnf update --refresh -y" \
@@ -204,6 +205,10 @@ run_step "Installing multimedia codecs" \
     "sudo dnf update -y @multimedia --setopt='install_weak_deps=False' --exclude=PackageKit-gstreamer-plugin"
 
 log "Hardware-accelerated video codecs"
+
+if [[ "$(systemd-detect-virt 2>/dev/null)" != "none" ]]; then
+    warn "Running in a VM; skipping hardware-accelerated codec installation."
+else
 
 # Detects vendor keywords across all VGA/3D controller lines rather than just
 # the first, so hybrid laptops (e.g. Intel iGPU + NVIDIA dGPU) still get the
@@ -267,6 +272,8 @@ fi
 
 if [[ $found_intel -eq 0 && $found_amd -eq 0 && $found_nvidia -eq 0 ]]; then
     warn "Could not detect GPU vendor; skipping hardware-accelerated codec installation."
+fi
+
 fi
 
 log "Removing unwanted default applications"
