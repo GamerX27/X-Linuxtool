@@ -1,49 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Gaming stack installer (Steam via package manager; Lutris/Heroic per your rules)
-# - Debian-based: Steam (apt), Wine/Winetricks/MangoHud/Vulkan/nvtop (apt),
-#                 Lutris (Flatpak), Heroic (Flatpak)
-# - Fedora-based: Steam (dnf), Wine/Winetricks/MangoHud/GameMode/Vulkan/nvtop (dnf),
-#                 Lutris (dnf), Heroic (Flatpak)
-# - Arch-based:   Steam (pacman), Wine/Winetricks/MangoHud/GameMode/Vulkan/nvtop (pacman),
-#                 Lutris (pacman), Heroic (AUR via yay)
-#
-# Run with sudo: sudo ./gaming-setup.sh
-
-if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
-    C_RESET=$'\033[0m'
-    C_BOLD=$'\033[1m'
-    C_DIM=$'\033[2m'
-
-    case "${TERM:-}" in
-        linux|screen|screen-*|tmux-*)
-            # Nearest 256-color approximations of the Nord palette.
-            C_BLUE=$'\033[38;5;110m'    # nord9  81a1c1
-            C_RED=$'\033[38;5;167m'     # nord11 bf616a
-            C_YELLOW=$'\033[38;5;222m'  # nord13 ebcb8b
-            C_GREEN=$'\033[38;5;150m'   # nord14 a3be8c
-            C_MAGENTA=$'\033[38;5;139m' # nord15 b48ead
-            ;;
-        *)
-            C_BLUE=$'\033[38;2;129;161;193m'   # nord9  81a1c1
-            C_RED=$'\033[38;2;191;97;106m'     # nord11 bf616a
-            C_YELLOW=$'\033[38;2;235;203;139m' # nord13 ebcb8b
-            C_GREEN=$'\033[38;2;163;190;140m'  # nord14 a3be8c
-            C_MAGENTA=$'\033[38;2;180;142;173m' # nord15 b48ead
-            ;;
-    esac
-else
-    C_RESET="" C_BOLD="" C_DIM=""
-    C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_MAGENTA=""
-fi
-
-ui_info()    { printf '%s  ›%s %s\n'   "$C_BLUE"   "$C_RESET" "$1"; }
-ui_ok()      { printf '%s  ✔%s %s\n'   "$C_GREEN"  "$C_RESET" "$1"; }
-ui_warn()    { printf '%s  ▲%s %s\n'   "$C_YELLOW" "$C_RESET" "$1"; }
-ui_err()     { printf '%s  ✖%s %s\n'   "$C_RED"    "$C_RESET" "$1" >&2; }
-ui_step()    { printf '\n%s  ➤ %s%s\n' "$C_MAGENTA$C_BOLD" "$1" "$C_RESET"; }
-ui_rule()    { printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM" "$C_RESET"; }
+ui_info()    { printf '  › %s\n' "$1"; }
+ui_ok()      { printf '  ✔ %s\n' "$1"; }
+ui_warn()    { printf '  ▲ %s\n' "$1"; }
+ui_err()     { printf '  ✖ %s\n' "$1" >&2; }
+ui_step()    { printf '\n  ➤ %s\n' "$1"; }
+ui_rule()    { printf '──────────────────────────────────────────────────────\n'; }
 
 require_root() {
   if [ "${EUID:-$(id -u)}" -ne 0 ]; then
@@ -62,8 +25,6 @@ ensure_flatpak_and_flathub() {
     elif have_cmd apt; then
       apt update
       apt install -y flatpak
-    elif have_cmd pacman; then
-      pacman -Syu --noconfirm flatpak
     else
       ui_err "Could not install Flatpak on this system."
       return 1
@@ -71,8 +32,17 @@ ensure_flatpak_and_flathub() {
   fi
   if ! flatpak remote-list | awk '{print $1}' | grep -q '^flathub$'; then
     ui_info "Adding Flathub…"
-    flatlam remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+    flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
   fi
+}
+
+install_flatpak_apps() {
+  ensure_flatpak_and_flathub || return 1
+  local app
+  for app in "$@"; do
+    ui_info "Installing ${app} (Flatpak)…"
+    flatpak install -y flathub "$app"
+  done
 }
 
 install_utilities() {
@@ -83,11 +53,7 @@ install_utilities() {
     ui_info "Installing MangoHud + nvtop (Debian/Ubuntu - skipping GameMode)…"
     apt update
     apt install -y mangohud nvtop
-    # Optional 32-bit MangoHud if multiarch enabled
     dpkg --print-foreign-architectures | grep -q '^i386$' && apt install -y mangohud:i386 || true
-  elif have_cmd pacman; then
-    ui_info "Installing MangoHud, GameMode + nvtop (Arch)…"
-    pacman -S --noconfirm mangohud gamemode nvtop
   fi
 }
 
@@ -107,8 +73,6 @@ ensure_curl() {
   elif have_cmd apt; then
     apt update
     apt install -y curl
-  elif have_cmd pacman; then
-    pacman -S --noconfirm curl
   else
     ui_err "Could not install curl on this system."
     return 1
@@ -116,7 +80,6 @@ ensure_curl() {
 }
 
 fetch_script() {
-  # fetch_script <script-name> <dest>; tries Codeberg first, then GitHub.
   local name="$1" dest="$2"
 
   if [ -n "$LOCAL_BASE" ] && [ -f "$LOCAL_BASE/$name" ]; then
@@ -137,6 +100,35 @@ fetch_script() {
   return 1
 }
 
+install_proton_update_command() {
+  local USERNAME USER_HOME bindir
+  USERNAME="${SUDO_USER:-$(logname 2>/dev/null || echo root)}"
+  USER_HOME="$(getent passwd "$USERNAME" | cut -d: -f6)"
+  bindir="$USER_HOME/.local/bin"
+
+  ui_info "Installing 'proton-cachyos-update' command to ${bindir}…"
+  sudo -u "$USERNAME" mkdir -p "$bindir"
+
+  cat > "$bindir/proton-cachyos-update" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+LOCAL_BASE="${LOCAL_BASE}"
+CODEBERG_RAW_BASE="${CODEBERG_RAW_BASE}"
+GITHUB_RAW_BASE="${GITHUB_RAW_BASE}"
+tmp="\$(mktemp -d)"
+trap 'rm -rf "\$tmp"' EXIT
+if [ -n "\$LOCAL_BASE" ] && [ -f "\$LOCAL_BASE/proton-cachyos-installer.sh" ]; then
+  cp "\$LOCAL_BASE/proton-cachyos-installer.sh" "\$tmp/proton-cachyos-installer.sh"
+elif ! curl -fsSL "\$CODEBERG_RAW_BASE/proton-cachyos-installer.sh" -o "\$tmp/proton-cachyos-installer.sh"; then
+  curl -fsSL "\$GITHUB_RAW_BASE/proton-cachyos-installer.sh" -o "\$tmp/proton-cachyos-installer.sh"
+fi
+bash "\$tmp/proton-cachyos-installer.sh"
+EOF
+  chown "$USERNAME:$USERNAME" "$bindir/proton-cachyos-update"
+  chmod 755 "$bindir/proton-cachyos-update"
+  ui_ok "Run 'proton-cachyos-update' anytime to check for and install Proton-CachyOS updates."
+}
+
 run_extra_installers() {
   ensure_curl || { ui_warn "Skipping extra installers (curl unavailable)."; return 0; }
 
@@ -155,6 +147,7 @@ run_extra_installers() {
       ui_info "Running ${s} as ${USERNAME}…"
       # These installers must NOT run as root, so drop privileges.
       sudo -u "$USERNAME" -H bash "$tmpdir/$s" || ui_err "${s} exited with errors."
+      [[ "$s" == "proton-cachyos-installer.sh" ]] && install_proton_update_command
     fi
   done
 }
@@ -187,13 +180,7 @@ install_debian_like() {
 
   install_utilities
 
-  ui_info "Installing Lutris (Flatpak) + Heroic (Flatpak)…"
-  ensure_flatpak_and_flathub
-  flatpak install -y flathub net.lutris.Lutris
-  flatpak install -y flathub com.heroicgameslauncher.hgl
-
-  ui_info "Installing Discord (Flatpak)…"
-  flatpak install -y flathub com.discordapp.Discord
+  install_flatpak_apps net.lutris.Lutris com.heroicgameslauncher.hgl com.discordapp.Discord
 }
 
 enable_rpmfusion_fedora() {
@@ -234,62 +221,7 @@ install_fedora_like() {
   ui_info "Installing Lutris (dnf)…"
   dnf install -y lutris
 
-  ui_info "Installing Heroic + Discord (Flatpak)…"
-  ensure_flatpak_and_flathub
-  flatpak install -y flathub com.heroicgameslauncher.hgl
-  flatpak install -y flathub com.discordapp.Discord
-}
-
-enable_arch_multilib() {
-  if ! grep -Eq '^\[multilib\]' /etc/pacman.conf; then
-    if grep -Eq '^\s*#\s*\[multilib\]' /etc/pacman.conf; then
-      ui_info "Enabling multilib repo in /etc/pacman.conf…"
-      sed -i "/\[multilib\]/,/Include/s/^#//" /etc/pacman.conf
-    fi
-  fi
-}
-
-ensure_yay() {
-  if have_cmd yay; then return 0; fi
-  ui_info "yay not found—installing from AUR…"
-  pacman -Syu --needed --noconfirm git base-devel
-  USERNAME="${SUDO_USER:-$(logname 2>/dev/null || echo root)}"
-  sudo -u "$USERNAME" bash -c '
-    set -e
-    cd "$HOME"
-    [ -d yay ] || git clone https://aur.archlinux.org/yay.git
-    cd yay
-    makepkg -si --noconfirm
-  '
-}
-
-install_arch_like() {
-  ui_step "Arch/Arch-based detected."
-  enable_arch_multilib
-  pacman -Syu --noconfirm
-
-  ui_info "Installing Steam (pacman)…"
-  pacman -S --noconfirm steam
-
-  ui_info "Installing Wine + Winetricks…"
-  pacman -S --noconfirm wine winetricks
-
-  ui_info "Installing Vulkan loader (64-bit + 32-bit)…"
-  pacman -S --noconfirm vulkan-icd-loader lib32-vulkan-icd-loader
-
-  ui_info "Installing Lutris (pacman)…"
-  pacman -S --noconfirm lutris
-
-  install_utilities
-
-  ui_info "Installing Heroic (AUR via yay)…"
-  ensure_yay
-  USERNAME="${SUDO_USER:-$(logname 2>/dev/null || echo root)}"
-  sudo -u "$USERNAME" yay -S --noconfirm heroic-games-launcher-bin
-
-  ui_info "Installing Discord (Flatpak)…"
-  ensure_flatpak_and_flathub
-  flatpak install -y flathub com.discordapp.Discord
+  install_flatpak_apps com.heroicgameslauncher.hgl com.discordapp.Discord
 }
 
 main() {
@@ -303,11 +235,9 @@ main() {
     install_debian_like
   elif echo "$id $id_like" | grep -Eq 'fedora|rhel|centos|nobara|rocky|alma'; then
     install_fedora_like
-  elif echo "$id $id_like" | grep -Eq 'arch|manjaro|endeavouros|garuda|arco|rebornos'; then
-    install_arch_like
   else
     ui_err "Unsupported or unrecognized distro: ${PRETTY_NAME:-unknown}"
-    echo "Targets: Debian-based, Fedora-based, and Arch-based."
+    echo "Targets: Debian-based and Fedora-based."
     exit 2
   fi
 

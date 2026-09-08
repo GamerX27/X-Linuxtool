@@ -2,39 +2,12 @@
 # Source https://github.com/CachyOS/proton-cachyos
 set -euo pipefail
 
-if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
-    C_RESET=$'\033[0m'
-    C_BOLD=$'\033[1m'
-    C_DIM=$'\033[2m'
-
-    case "${TERM:-}" in
-        linux|screen|screen-*|tmux-*)
-            # Nearest 256-color approximations of the Nord palette.
-            C_BLUE=$'\033[38;5;110m'    # nord9  81a1c1
-            C_RED=$'\033[38;5;167m'     # nord11 bf616a
-            C_YELLOW=$'\033[38;5;222m'  # nord13 ebcb8b
-            C_GREEN=$'\033[38;5;150m'   # nord14 a3be8c
-            C_MAGENTA=$'\033[38;5;139m' # nord15 b48ead
-            ;;
-        *)
-            C_BLUE=$'\033[38;2;129;161;193m'   # nord9  81a1c1
-            C_RED=$'\033[38;2;191;97;106m'     # nord11 bf616a
-            C_YELLOW=$'\033[38;2;235;203;139m' # nord13 ebcb8b
-            C_GREEN=$'\033[38;2;163;190;140m'  # nord14 a3be8c
-            C_MAGENTA=$'\033[38;2;180;142;173m' # nord15 b48ead
-            ;;
-    esac
-else
-    C_RESET="" C_BOLD="" C_DIM=""
-    C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_MAGENTA=""
-fi
-
-ui_info()    { printf '%s  ›%s %s\n'   "$C_BLUE"   "$C_RESET" "$1"; }
-ui_ok()      { printf '%s  ✔%s %s\n'   "$C_GREEN"  "$C_RESET" "$1"; }
-ui_warn()    { printf '%s  ▲%s %s\n'   "$C_YELLOW" "$C_RESET" "$1"; }
-ui_err()     { printf '%s  ✖%s %s\n'   "$C_RED"    "$C_RESET" "$1" >&2; }
-ui_step()    { printf '\n%s  ➤ %s%s\n' "$C_MAGENTA$C_BOLD" "$1" "$C_RESET"; }
-ui_rule()    { printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM" "$C_RESET"; }
+ui_info()    { printf '  › %s\n' "$1"; }
+ui_ok()      { printf '  ✔ %s\n' "$1"; }
+ui_warn()    { printf '  ▲ %s\n' "$1"; }
+ui_err()     { printf '  ✖ %s\n' "$1" >&2; }
+ui_step()    { printf '\n  ➤ %s\n' "$1"; }
+ui_rule()    { printf '──────────────────────────────────────────────────────\n'; }
 
 REPO="CachyOS/proton-cachyos"
 API_URL="https://api.github.com/repos/${REPO}/releases/latest"
@@ -76,6 +49,13 @@ find_compat_dir() {
 COMPAT_DIR="$(find_compat_dir)"
 ui_info "Steam compatibility tools directory: $COMPAT_DIR"
 
+CURRENT_LINK="$COMPAT_DIR/proton-cachyos"
+CURRENT_TAG=""
+if [[ -L "$CURRENT_LINK" ]]; then
+  CURRENT_TAG="$(basename "$(readlink -f "$CURRENT_LINK")")"
+  CURRENT_TAG="${CURRENT_TAG#proton-cachyos-}"
+fi
+
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -103,6 +83,11 @@ PY
 fi
 
 [[ -z "${ASSET_URL:-}" ]] && { ui_err "no matching asset found"; exit 1; }
+
+if [[ -n "$CURRENT_TAG" && "$CURRENT_TAG" == "$TAG" ]]; then
+  ui_ok "Proton-CachyOS is already up to date ($TAG)"
+  exit 0
+fi
 
 ui_info "Latest version: $TAG"
 ui_info "Downloading $ASSET_NAME..."
@@ -163,7 +148,6 @@ cat > "$INSTALL_PATH/compatibilitytool.vdf" <<'VDF'
 }
 VDF
 
-# Symlink for convenience
 ln -sfn "$INSTALL_PATH" "$COMPAT_DIR/proton-cachyos"
 
 echo
