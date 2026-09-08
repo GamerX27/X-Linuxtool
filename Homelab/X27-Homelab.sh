@@ -10,26 +10,15 @@ if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
     C_BOLD=$'\033[1m'
     C_DIM=$'\033[2m'
-
-    case "${TERM:-}" in
-        linux|screen|screen-*|tmux-*)
-            C_BLUE=$'\033[38;5;110m'    # nord9  81a1c1
-            C_RED=$'\033[38;5;167m'     # nord11 bf616a
-            C_YELLOW=$'\033[38;5;222m'  # nord13 ebcb8b
-            C_GREEN=$'\033[38;5;150m'   # nord14 a3be8c
-            C_MAGENTA=$'\033[38;5;139m' # nord15 b48ead
-            ;;
-        *)
-            C_BLUE=$'\033[38;2;129;161;193m'   # nord9  81a1c1
-            C_RED=$'\033[38;2;191;97;106m'     # nord11 bf616a
-            C_YELLOW=$'\033[38;2;235;203;139m' # nord13 ebcb8b
-            C_GREEN=$'\033[38;2;163;190;140m'  # nord14 a3be8c
-            C_MAGENTA=$'\033[38;2;180;142;173m' # nord15 b48ead
-            ;;
-    esac
+    C_BLUE=$'\033[34m'
+    C_RED=$'\033[31m'
+    C_YELLOW=$'\033[33m'
+    C_GREEN=$'\033[32m'
+    C_MAGENTA=$'\033[35m'
+    C_INVERT=$'\033[7m'
 else
     C_RESET="" C_BOLD="" C_DIM=""
-    C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_MAGENTA=""
+    C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_MAGENTA="" C_INVERT=""
 fi
 
 ui_info()    { printf '%s  ›%s %s\n'   "$C_BLUE"   "$C_RESET" "$1"; }
@@ -43,6 +32,205 @@ ui_menu_item() {
     printf '   %s%s)%s %s%s%s\n' \
         "$C_BOLD" "$1" "$C_RESET" \
         "$C_BOLD" "$2" "$C_RESET"
+}
+
+ui_pick() {
+    # ui_pick <title> <item1> <item2> ... ; entries prefixed with $'\x01'
+    # start a new category (its text is the category name); items following
+    # it belong to that category until the next $'\x01' entry. With
+    # categories: Up/Down + Enter first browse the category list, Enter
+    # drills into one, "← Back" (or Esc) returns to the category list;
+    # typing at any point switches to a flat search across every item
+    # (shown with its category tag), Enter on a match runs it directly. With
+    # no categories, it's a single flat Up/Down + Enter + type-to-search
+    # list. On success sets PICK_INDEX (0-based, counting only selectable
+    # entries, in input order) and returns 0. Returns 1 if the user
+    # cancelled (Esc at the top level), or 2 if there's no real terminal to
+    # run the picker on (caller should fall back to a plain numbered
+    # prompt).
+    local title="$1"
+    shift
+    local -a raw=("$@")
+    local -a item_raw_idx=()
+    local -A k_of_raw=()
+    local -a cat_names=()
+    local -A cat_of_k=()
+    local i cur_cat=-1
+
+    if [ "$INPUT" != "/dev/tty" ]; then
+        return 2
+    fi
+
+    for i in "${!raw[@]}"; do
+        if [[ "${raw[$i]}" == $'\x01'* ]]; then
+            cat_names+=("${raw[$i]#$'\x01'}")
+            cur_cat=$((${#cat_names[@]} - 1))
+        else
+            k_of_raw[$i]=${#item_raw_idx[@]}
+            item_raw_idx+=("$i")
+            cat_of_k[${k_of_raw[$i]}]=$cur_cat
+        fi
+    done
+    local has_categories=0
+    [ "${#cat_names[@]}" -gt 0 ] && has_categories=1
+
+    local old_stty
+    old_stty="$( { stty -g < "$INPUT"; } 2>/dev/null )" || return 2
+    { stty -echo -icanon min 1 time 0 < "$INPUT"; } 2>/dev/null
+    trap '{ stty "$old_stty" < "$INPUT"; } 2>/dev/null; printf "\n"; exit 130' INT
+
+    local filter="" selected=0 key rest k c needle entry n result=1 plain
+    local view="cats"
+    [ "$has_categories" -eq 0 ] && view="items"
+    local current_cat=0 back_row=0
+
+    local -a nav_labels=() nav_k=() filtered=()
+
+    while true; do
+        needle="${filter,,}"
+        filtered=()
+        for k in "${!item_raw_idx[@]}"; do
+            entry="$((k+1))) ${raw[${item_raw_idx[$k]}]}"
+            if [ -z "$needle" ] || [[ "${entry,,}" == *"$needle"* ]]; then
+                filtered+=("$k")
+            fi
+        done
+
+        if [ -n "$filter" ]; then
+            view="search"
+        elif [ "$view" = "search" ]; then
+            view="cats"
+            [ "$has_categories" -eq 0 ] && view="items"
+        fi
+
+        nav_labels=()
+        nav_k=()
+        back_row=0
+        case "$view" in
+            cats)
+                for c in "${!cat_names[@]}"; do
+                    nav_labels+=("${cat_names[$c]}")
+                    nav_k+=(-1)
+                done
+                ;;
+            items)
+                if [ "$has_categories" -eq 1 ]; then
+                    nav_labels+=("← Back")
+                    nav_k+=(-1)
+                    back_row=1
+                fi
+                for k in "${!item_raw_idx[@]}"; do
+                    if [ "$has_categories" -eq 0 ] || [ "${cat_of_k[$k]}" -eq "$current_cat" ]; then
+                        nav_labels+=("${raw[${item_raw_idx[$k]}]}")
+                        nav_k+=("$k")
+                    fi
+                done
+                ;;
+            search)
+                for k in "${filtered[@]}"; do
+                    if [ "$has_categories" -eq 1 ]; then
+                        nav_labels+=("${C_DIM}[${cat_names[${cat_of_k[$k]}]}]${C_RESET} ${raw[${item_raw_idx[$k]}]}")
+                    else
+                        nav_labels+=("${raw[${item_raw_idx[$k]}]}")
+                    fi
+                    nav_k+=("$k")
+                done
+                ;;
+        esac
+
+        n=${#nav_labels[@]}
+        if [ "$n" -eq 0 ]; then
+            selected=0
+        elif [ "$selected" -ge "$n" ]; then
+            selected=$((n - 1))
+        fi
+
+        clear 2>/dev/null
+        case "$view" in
+            cats) ui_step "$title" ;;
+            items)
+                if [ "$has_categories" -eq 1 ]; then
+                    ui_step "${cat_names[$current_cat]}"
+                else
+                    ui_step "$title"
+                fi
+                ;;
+            search) ui_step "$title — search" ;;
+        esac
+        printf '%s  Search:%s %s\n\n' "$C_BOLD" "$C_RESET" "$filter"
+
+        if [ "$n" -eq 0 ]; then
+            printf '%s  (no matches)%s\n' "$C_DIM" "$C_RESET"
+        else
+            for i in "${!nav_labels[@]}"; do
+                if [ "$i" -eq "$selected" ]; then
+                    if [ "$view" = "search" ]; then
+                        printf '  %s❯%s %s\n' "$C_INVERT" "$C_RESET" "${nav_labels[$i]}"
+                    else
+                        printf -v plain '%-40s' "${nav_labels[$i]}"
+                        printf '  %s%s%s\n' "$C_INVERT" "$plain" "$C_RESET"
+                    fi
+                else
+                    printf '    %s\n' "${nav_labels[$i]}"
+                fi
+            done
+        fi
+
+        printf '\n%s  ↑/↓ move · Enter select · Esc back · type to search%s\n' "$C_DIM" "$C_RESET"
+
+        IFS= read -rsn1 key < "$INPUT" || { result=1; break; }
+        case "$key" in
+            $'\x1b')
+                rest=""
+                IFS= read -rsn2 -t 0.05 rest < "$INPUT"
+                case "$rest" in
+                    '[A') [ "$n" -gt 0 ] && selected=$(( (selected - 1 + n) % n )) ;;
+                    '[B') [ "$n" -gt 0 ] && selected=$(( (selected + 1) % n )) ;;
+                    '')
+                        if [ -n "$filter" ]; then
+                            filter=""
+                            selected=0
+                        elif [ "$view" = "items" ] && [ "$has_categories" -eq 1 ]; then
+                            view="cats"
+                            selected=0
+                        else
+                            result=1
+                            break
+                        fi
+                        ;;
+                    *) result=1; break ;;
+                esac
+                ;;
+            ''|$'\n'|$'\r')
+                if [ "$n" -eq 0 ]; then
+                    :
+                elif [ "$view" = "cats" ]; then
+                    current_cat=$selected
+                    view="items"
+                    selected=0
+                elif [ "$view" = "items" ] && [ "$back_row" -eq 1 ] && [ "$selected" -eq 0 ]; then
+                    view="cats"
+                    selected=0
+                else
+                    PICK_INDEX=${nav_k[$selected]}
+                    result=0
+                    break
+                fi
+                ;;
+            $'\x7f'|$'\x08')
+                filter="${filter%?}"
+                selected=0
+                ;;
+            *)
+                filter+="$key"
+                selected=0
+                ;;
+        esac
+    done
+
+    { stty "$old_stty" < "$INPUT"; } 2>/dev/null
+    trap - INT
+    return "$result"
 }
 
 CODEBERG_RAW="https://codeberg.org/X27/X-Linuxtool/raw/branch/main/Homelab"
@@ -87,16 +275,28 @@ fetch_repo_file() {
     return 1
 }
 
+MENU_LABELS=("Install Docker" "Auto Update setup" "Docker Compose Updater" "Back")
+LAST_MENU_INDEX=3
+
 while true; do
     clear 2>/dev/null
-    ui_step "HomeLab"
-    ui_rule
-    ui_menu_item 1 "Install Docker"
-    ui_menu_item 2 "Auto Update setup"
-    ui_menu_item 3 "Docker Compose Updater"
-    ui_menu_item 0 "Back"
-    printf '%s  ❯%s Enter your choice [0-3]: ' "$C_BOLD" "$C_RESET"
-    read -r choice < "$INPUT" || exit 0
+
+    if [ "$INPUT" = "/dev/tty" ]; then
+        if ui_pick "HomeLab" "${MENU_LABELS[@]}"; then
+            [ "$PICK_INDEX" -eq "$LAST_MENU_INDEX" ] && choice=0 || choice=$((PICK_INDEX + 1))
+        else
+            choice=0
+        fi
+    else
+        ui_step "HomeLab"
+        ui_rule
+        ui_menu_item 1 "Install Docker"
+        ui_menu_item 2 "Auto Update setup"
+        ui_menu_item 3 "Docker Compose Updater"
+        ui_menu_item 0 "Back"
+        printf '%s  ❯%s Enter your choice [0-3]: ' "$C_BOLD" "$C_RESET"
+        read -r choice < "$INPUT" || exit 0
+    fi
 
     case $choice in
         0)

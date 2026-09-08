@@ -8,28 +8,14 @@ COMPOSE_SUBDIR="docker"
 
 if [[ -t 1 ]] && [[ "${TERM:-dumb}" != "dumb" ]] && [[ -z "${NO_COLOR:-}" ]]; then
   C_RESET=$'\e[0m'; C_BOLD=$'\e[1m'; C_DIM=$'\e[2m'
-  case "${TERM:-}" in
-    linux|screen|screen-*|tmux-*)
-      C_CYAN=$'\e[38;5;116m'     # nord8  88c0d0
-      C_BLUE=$'\e[38;5;110m'     # nord9  81a1c1
-      C_RED=$'\e[38;5;167m'      # nord11 bf616a
-      C_YELLOW=$'\e[38;5;222m'   # nord13 ebcb8b
-      C_GREEN=$'\e[38;5;150m'    # nord14 a3be8c
-      C_MAGENTA=$'\e[38;5;139m'  # nord15 b48ead
-      BG_ACCENT=$'\e[48;5;167m'  # nord11 bf616a
-      FG_ONACCENT=$'\e[38;5;236m' # nord0  2e3440
-      ;;
-    *)
-      C_CYAN=$'\e[38;2;136;192;208m'    # nord8  88c0d0
-      C_BLUE=$'\e[38;2;129;161;193m'    # nord9  81a1c1
-      C_RED=$'\e[38;2;191;97;106m'      # nord11 bf616a
-      C_YELLOW=$'\e[38;2;235;203;139m'  # nord13 ebcb8b
-      C_GREEN=$'\e[38;2;163;190;140m'   # nord14 a3be8c
-      C_MAGENTA=$'\e[38;2;180;142;173m' # nord15 b48ead
-      BG_ACCENT=$'\e[48;2;191;97;106m'  # nord11 bf616a
-      FG_ONACCENT=$'\e[38;2;46;52;64m'  # nord0  2e3440
-      ;;
-  esac
+  C_CYAN=$'\e[36m'
+  C_BLUE=$'\e[34m'
+  C_RED=$'\e[31m'
+  C_YELLOW=$'\e[33m'
+  C_GREEN=$'\e[32m'
+  C_MAGENTA=$'\e[35m'
+  BG_ACCENT=$'\e[41m'
+  FG_ONACCENT=$'\e[30m'
 else
   C_RESET="" C_BOLD="" C_DIM=""
   C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_CYAN="" C_MAGENTA=""

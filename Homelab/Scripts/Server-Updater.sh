@@ -26,23 +26,11 @@ AUTO_REBOOT="0"
 # non-interactively via cron and its output is logged to a plain text file).
 if [[ -t 1 ]] && [[ "${TERM:-dumb}" != "dumb" ]] && [[ -z "${NO_COLOR:-}" ]]; then
   C_RESET=$'\e[0m'; C_BOLD=$'\e[1m'; C_DIM=$'\e[2m'
-  case "${TERM:-}" in
-    linux|screen|screen-*|tmux-*)
-      # Nearest 256-color approximations of the Nord palette.
-      C_BLUE=$'\e[38;5;110m'    # nord9  81a1c1
-      C_RED=$'\e[38;5;167m'     # nord11 bf616a
-      C_YELLOW=$'\e[38;5;222m'  # nord13 ebcb8b
-      C_GREEN=$'\e[38;5;150m'   # nord14 a3be8c
-      C_MAGENTA=$'\e[38;5;139m' # nord15 b48ead
-      ;;
-    *)
-      C_BLUE=$'\e[38;2;129;161;193m'   # nord9  81a1c1
-      C_RED=$'\e[38;2;191;97;106m'     # nord11 bf616a
-      C_YELLOW=$'\e[38;2;235;203;139m' # nord13 ebcb8b
-      C_GREEN=$'\e[38;2;163;190;140m'  # nord14 a3be8c
-      C_MAGENTA=$'\e[38;2;180;142;173m' # nord15 b48ead
-      ;;
-  esac
+  C_BLUE=$'\e[34m'
+  C_RED=$'\e[31m'
+  C_YELLOW=$'\e[33m'
+  C_GREEN=$'\e[32m'
+  C_MAGENTA=$'\e[35m'
 else
   C_RESET="" C_BOLD="" C_DIM=""
   C_BLUE="" C_RED="" C_YELLOW="" C_GREEN="" C_MAGENTA=""

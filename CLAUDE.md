@@ -50,12 +50,13 @@ instead of re-downloading, so local edits take effect immediately when
 testing through the menu.
 
 **Self-contained scripts, by design.** Nearly every script duplicates the same
-Nord-palette color setup and logging helpers (`ui_info`/`ui_ok`/`ui_warn`/
-`ui_err` in menu/dispatcher scripts, `log`/`ok`/`warn`/`err` in some leaf
-scripts like `Fedora-PostSetup.sh`) instead of sourcing a shared lib. This is
-intentional, not an oversight — each script must keep working when piped
-directly via `curl | bash` on its own, so it can't depend on other files
-existing on disk. Don't "DRY up" this duplication across files.
+plain-ANSI color setup (ordinary 8-color codes, no palette/theme) and logging
+helpers (`ui_info`/`ui_ok`/`ui_warn`/`ui_err` in menu/dispatcher scripts,
+`log`/`ok`/`warn`/`err` in some leaf scripts like `Fedora-PostSetup.sh`)
+instead of sourcing a shared lib. This is intentional, not an oversight — each
+script must keep working when piped directly via `curl | bash` on its own, so
+it can't depend on other files existing on disk. Don't "DRY up" this
+duplication across files.
 
 **Interactive input under `curl | bash`.** When a script is piped into bash,
 stdin is consumed by the pipe itself. Menu/dispatcher scripts work around this
@@ -80,9 +81,9 @@ unauthenticated.
 - **Keep it straightforward.** Don't add abstractions, flags, or config
   options for hypothetical future needs. If a bug fix is 3 lines, write 3
   lines.
-- **Keep the code clean.** Match the existing style in each file (Nord color
-  helpers, `ui_info`/`ui_ok`/`ui_warn`/`ui_err` output functions, function
-  naming) rather than introducing a new pattern.
+- **Keep the code clean.** Match the existing style in each file (plain ANSI
+  color helpers, `ui_info`/`ui_ok`/`ui_warn`/`ui_err` output functions,
+  function naming) rather than introducing a new pattern.
 - **Minimal comments.** Default to no comments. Only add one when it explains
   a non-obvious WHY (a workaround, a distro/env quirk, a magic number) —
   never a comment that just restates what the next line does, and never
