@@ -50,12 +50,12 @@ try() {
 }
 
 # Repository locations: Codeberg is primary, GitHub is a fallback mirror.
-CODEBERG_RAW="https://codeberg.org/X27/X-Linuxtool/raw/branch/main/Desktop"
-GITHUB_RAW="https://raw.githubusercontent.com/GamerX27/X-Linuxtool/main/Desktop"
+CODEBERG_RAW="https://codeberg.org/X27/X-Linuxtool/raw/branch/main/Desktop/Linux-Desktop"
+GITHUB_RAW="https://raw.githubusercontent.com/GamerX27/X-Linuxtool/main/Desktop/Linux-Desktop"
 
 # When invoked by a local X-Linuxtool.sh clone, X27_LOCAL_ROOT points at
 # the clone root; prefer the scripts already on disk over re-downloading.
-LOCAL_BASE="${X27_LOCAL_ROOT:+$X27_LOCAL_ROOT/Desktop}"
+LOCAL_BASE="${X27_LOCAL_ROOT:+$X27_LOCAL_ROOT/Desktop/Linux-Desktop}"
 
 _download() {
     # _download <url> <output-file>

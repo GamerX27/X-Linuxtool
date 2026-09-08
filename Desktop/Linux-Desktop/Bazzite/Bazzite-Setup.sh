@@ -1,11 +1,5 @@
 #!/bin/bash
 
-if [ -r /dev/tty ]; then
-    INPUT=/dev/tty
-else
-    INPUT=/dev/stdin
-fi
-
 if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RESET=$'\033[0m'
     C_BOLD=$'\033[1m'
@@ -38,23 +32,17 @@ ui_ok()      { printf '%s  ✔%s %s\n'   "$C_GREEN"  "$C_RESET" "$1"; }
 ui_warn()    { printf '%s  ▲%s %s\n'   "$C_YELLOW" "$C_RESET" "$1"; }
 ui_err()     { printf '%s  ✖%s %s\n'   "$C_RED"    "$C_RESET" "$1" >&2; }
 ui_step()    { printf '\n%s  ➤ %s%s\n' "$C_MAGENTA$C_BOLD" "$1" "$C_RESET"; }
-ui_rule()    { printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM" "$C_RESET"; }
 
-ui_menu_item() {
-    # ui_menu_item <number> <label>
-    printf '   %s%s)%s %s%s%s\n' \
-        "$C_BOLD" "$1" "$C_RESET" \
-        "$C_BOLD" "$2" "$C_RESET"
-}
+ui_step "Setting Up Bazzite Machine"
 
 # Codeberg is the primary source; GitHub is a mirror used as a fallback when
 # Codeberg cannot be reached.
-CODEBERG_RAW="https://codeberg.org/X27/X-Linuxtool/raw/branch/main/Desktop/Gaming"
-GITHUB_RAW="https://raw.githubusercontent.com/GamerX27/X-Linuxtool/main/Desktop/Gaming"
+CODEBERG_RAW="https://codeberg.org/X27/X-Linuxtool/raw/branch/main/Desktop/Linux-Desktop"
+GITHUB_RAW="https://raw.githubusercontent.com/GamerX27/X-Linuxtool/main/Desktop/Linux-Desktop"
 
 # When invoked by a local X-Linuxtool.sh clone, X27_LOCAL_ROOT points at
 # the clone root; prefer the scripts already on disk over re-downloading.
-LOCAL_BASE="${X27_LOCAL_ROOT:+$X27_LOCAL_ROOT/Desktop/Gaming}"
+LOCAL_BASE="${X27_LOCAL_ROOT:+$X27_LOCAL_ROOT/Desktop/Linux-Desktop}"
 
 _download() {
     # _download <url> <output-file>
@@ -94,54 +82,49 @@ fetch_repo_file() {
     return 1
 }
 
-# Loop this submenu until the user explicitly backs out, so finishing one
-# task (e.g. installing Wine) returns here instead of exiting the script —
-# that's what lets you run another Gaming task, or pick "Back" to return to
-# the main X-Linuxtool.sh menu.
-while true; do
-    clear 2>/dev/null
-    ui_step "Proton / Wine & Gaming"
-    ui_rule
-    ui_menu_item 1 "Proton-CachyOS"
-    ui_menu_item 2 "Wine"
-    ui_menu_item 3 "Gaming Setup"
-    ui_menu_item 0 "Back"
-    printf '%s  ❯%s Enter your choice [0-3]: ' "$C_BOLD" "$C_RESET"
-    read -r choice < "$INPUT" || exit 0
 
-    case $choice in
-        0)
-            ui_info "Returning to the main menu…"
-            exit 0
-            ;;
-        1)
-            ui_step "Proton-CachyOS"
-            fetch_repo_file "proton-cachyos-installer.sh" /tmp/proton-cachyos-installer.sh || exit 1
-            chmod +x /tmp/proton-cachyos-installer.sh
-            bash /tmp/proton-cachyos-installer.sh
-            rm -f /tmp/proton-cachyos-installer.sh
-            ;;
-        2)
-            ui_step "Wine"
-            fetch_repo_file "Kron4ek-wine-installer.sh" /tmp/Kron4ek-wine-installer.sh || exit 1
-            chmod +x /tmp/Kron4ek-wine-installer.sh
-            bash /tmp/Kron4ek-wine-installer.sh
-            rm -f /tmp/Kron4ek-wine-installer.sh
-            ;;
-        3)
-            ui_step "Gaming Setup"
-            fetch_repo_file "Gaming.sh" /tmp/Gaming.sh || exit 1
-            chmod +x /tmp/Gaming.sh
-            sudo /tmp/Gaming.sh
-            sudo rm -f /tmp/Gaming.sh
-            ;;
-        *)
-            ui_err "Invalid choice."
-            ;;
-    esac
+ui_step "Disabling NetworkManager connectivity check..."
+NM_DIR_ETC="/etc/NetworkManager/conf.d"
+NM_FILE_ETC="${NM_DIR_ETC}/20-connectivity-fedora.conf"
+mkdir -p "$NM_DIR_ETC"
+if [[ -e "$NM_FILE_ETC" ]]; then
+    cp -n "$NM_FILE_ETC" "${NM_FILE_ETC}.bak" || ui_warn "Failed to back up NetworkManager config."
+fi
+printf '[connectivity]\nenabled=false\n' > "$NM_FILE_ETC"
+systemctl restart NetworkManager
 
-    printf '\n'
-    printf '%s  ❯%s Press Enter to return to this menu… ' "$C_BOLD" "$C_RESET"
-    read -r _ < "$INPUT"
-    printf '%s' "$C_RESET"
-done
+ui_step "Replacing Firefox with Brave Browser..."
+if flatpak list --app | grep -q "org.mozilla.firefox"; then
+    ui_info "Firefox Flatpak found, removing..."
+    flatpak uninstall -y org.mozilla.firefox
+else
+    ui_warn "Firefox Flatpak not found, skipping removal."
+fi
+ui_info "Installing Brave Browser from Flathub..."
+flatpak install -y flathub com.brave.Browser com.brave.Browser
+
+
+
+ui_step "Running Make Brave Great Again Tweak..."
+fetch_repo_file "Browser/make_brave_great_again.sh" make_brave_great_again.sh
+bash make_brave_great_again.sh
+rm -f make_brave_great_again.sh
+
+
+
+ui_step "Running a update..."
+ujust update
+
+ui_ok "Setup complete! Reboot recommended."
+printf 'Reboot now? (y/n): '
+read -r reboot_choice
+if [[ "$reboot_choice" == "y" || "$reboot_choice" == "Y" ]]; then
+    ui_info "Rebooting in..."
+    for count in 10 9 8 7 6 5 4 3 2 1 0; do
+        echo "$count"
+        sleep 1
+    done
+    reboot
+else
+    ui_warn "Skipping reboot. Don't forget to restart when ready!"
+fi

@@ -10,9 +10,12 @@ The Desktop and HomeLab toolboxes used to live in their own repos
 (`X27-Linux-Desktop-Toolbox`, `X27-Homelab-ToolBox`); they are now merged into
 this repo (full history preserved) so everything ships from one place:
 
-- `Desktop/` — desktop setup scripts (Fedora, Bazzite, Gaming, Flatpak, Browser, Tools)
+- `Desktop/` — desktop setup scripts: dispatchers in `Desktop/Scripts/`
+  (`Fedora.sh`, `GamingTools.sh`), leaf scripts by category in
+  `Desktop/Linux-Desktop/` (Fedora, Bazzite, Gaming, Flatpak, Browser)
 - `Homelab/` — server / homelab scripts (Docker, updates)
-- `X-Linuxtool.sh` — the menu launcher, which fetches the option you pick from `Desktop/` or `Homelab/`
+- `Tools/` — shared utilities (Fastfetch, Sleep Fix, Virtualization)
+- `X-Linuxtool.sh` — the menu launcher, which fetches the option you pick from `Desktop/`, `Homelab/`, or `Tools/`
 
 `YTDLP-Easy-Script` remains a separate repo and is fetched from its own location.
 
@@ -48,18 +51,24 @@ chmod +x X-Linuxtool.sh
 
 | # | Option | Description |
 |---|--------|-------------|
-| 1 | Fedora Desktop | Fedora desktop setup (`Desktop/Fedora.sh`) |
+| 1 | Desktop-Linux | Opens a submenu (`Desktop/Scripts/Fedora.sh`) — see below |
 | 2 | HomeLab | HomeLab setup script (`Homelab/X27-Homelab.sh`) |
-| 3 | Brave Debloat | Debloat / harden the Brave browser |
-| 4 | YT-DLP-Easy Installer | Install the YT-DLP-Easy script |
-| 5 | Kron4ek Wine Installer | Install Wine builds from Kron4ek |
-| 6 | Proton CachyOS Installer | Install Proton-CachyOS |
-| 7 | Gigabyte Sleep Fix | Fix sleep issues on Gigabyte boards |
-| 8 | Custom Fastfetch Config | Apply a custom Fastfetch configuration |
-| 9 | Virtualization Setup | Set up virtualization (KVM/QEMU/libvirt) |
-| 10 | Gaming Full Stack Setup | Install Steam, Wine, MangoHud, Lutris, Heroic and Discord for your distro |
-| 11 | Flatpak Apps Install | Install a curated set of Flatpak apps |
-| 12 | Flatpak Auto-Update Setup | Schedule Flatpak updates via a systemd timer |
+| 3 | YT-DLP | Install the YT-DLP-Easy script |
+| 4 | Fastfetch | Apply a custom Fastfetch configuration |
+| 5 | Virtualization | Set up virtualization (KVM/QEMU/libvirt) |
+
+### Desktop-Linux submenu
+
+| # | Option | Description |
+|---|--------|-------------|
+| 1 | Fedora Post-Setup | Fedora desktop post-install setup |
+| 2 | Fedora-Kinoite-Setup | Fedora Kinoite (atomic) setup |
+| 3 | Bazzite Setup | Bazzite setup |
+| 4 | Brave | Debloat / harden the Brave browser |
+| 5 | Proton/Wine & Gaming | Opens a further submenu — Proton-CachyOS, Kron4ek Wine builds, or the full gaming stack (Steam, Wine, MangoHud, Lutris, Heroic, Discord) |
+| 6 | Sleep Fix | Fix sleep issues on Gigabyte boards |
+| 7 | Flatpak Apps | Install a curated set of Flatpak apps |
+| 8 | Flatpak Updates | Schedule Flatpak updates via a systemd timer |
 
 ## Requirements
 

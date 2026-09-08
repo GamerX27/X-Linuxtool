@@ -58,12 +58,12 @@ install_utilities() {
 }
 
 # These scripts live in the repo's Gaming/ folder. Codeberg is primary, GitHub is fallback.
-CODEBERG_RAW_BASE="https://codeberg.org/X27/X-Linuxtool/raw/branch/main/Desktop/Gaming"
-GITHUB_RAW_BASE="https://raw.githubusercontent.com/GamerX27/X-Linuxtool/main/Desktop/Gaming"
+CODEBERG_RAW_BASE="https://codeberg.org/X27/X-Linuxtool/raw/branch/main/Desktop/Linux-Desktop/Gaming"
+GITHUB_RAW_BASE="https://raw.githubusercontent.com/GamerX27/X-Linuxtool/main/Desktop/Linux-Desktop/Gaming"
 
 # When invoked by a local X-Linuxtool.sh clone, X27_LOCAL_ROOT points at
 # the clone root; prefer the scripts already on disk over re-downloading.
-LOCAL_BASE="${X27_LOCAL_ROOT:+$X27_LOCAL_ROOT/Desktop/Gaming}"
+LOCAL_BASE="${X27_LOCAL_ROOT:+$X27_LOCAL_ROOT/Desktop/Linux-Desktop/Gaming}"
 
 ensure_curl() {
   have_cmd curl && return 0
@@ -135,7 +135,6 @@ run_extra_installers() {
   local USERNAME tmpdir
   USERNAME="${SUDO_USER:-$(logname 2>/dev/null || echo root)}"
   tmpdir="$(mktemp -d)"
-  trap 'rm -rf "$tmpdir"' RETURN
   # Allow the target (non-root) user to read the downloaded scripts.
   chmod 755 "$tmpdir"
 
@@ -150,6 +149,8 @@ run_extra_installers() {
       [[ "$s" == "proton-cachyos-installer.sh" ]] && install_proton_update_command
     fi
   done
+
+  rm -rf "$tmpdir"
 }
 
 install_debian_like() {

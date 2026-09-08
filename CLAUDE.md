@@ -6,24 +6,38 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Interactive launcher for X27's Linux setup/tooling scripts. `X-Linuxtool.sh` is
 the menu entrypoint; it fetches and runs the picked script from `Desktop/`
-(desktop setup: Fedora, Bazzite, Gaming, Flatpak, Browser, Tools) or
-`Homelab/` (server/Docker scripts). Scripts are plain bash, fetched from
-Codeberg (primary) with a GitHub mirror fallback, and are meant to be run via
+(desktop setup: Fedora, Bazzite, Gaming, Flatpak, Browser) or `Homelab/`
+(server/Docker scripts), plus a top-level `Tools/` (Fastfetch, Sleep Fix,
+Virtualization) shared by both. Scripts are plain bash, fetched from Codeberg
+(primary) with a GitHub mirror fallback, and are meant to be run via
 `curl | bash` as well as locally. The project is built around bash scripting,
 with JSON files used here and there (e.g. for config/data).
 
 There is no build, lint, or test tooling (no package.json, Makefile, CI, or
 shellcheck config) — this is pure bash. To verify a change, run the affected
-script directly: `bash Desktop/<area>/<Script>.sh` for a leaf script, or
-`./X-Linuxtool.sh` locally to drive it through the full menu chain.
+script directly: `bash Desktop/Linux-Desktop/<area>/<Script>.sh` for a leaf
+script, or `./X-Linuxtool.sh` locally to drive it through the full menu
+chain.
 
 ## Architecture
 
+**Layout.** Each domain (`Desktop/`, `Homelab/`) keeps its dispatcher scripts
+under a `Scripts/` subdirectory and its leaf/worker scripts grouped by
+category one level below that: `Desktop/Scripts/` (`Fedora.sh`,
+`GamingTools.sh`) dispatches into `Desktop/Linux-Desktop/<category>/`
+(`Fedora/`, `Bazzite/`, `Browser/`, `Flatpak/`, `Gaming/`); `Homelab/Scripts/`
+dispatches into itself (`Docker/`, `Server-Updater.sh`) from the domain-root
+entrypoint `Homelab/X27-Homelab.sh`. A shared top-level `Tools/` (Fastfetch,
+Sleep Fix, Virtualization) sits outside both domains, fetched directly by
+`X-Linuxtool.sh` or by `Fedora.sh`.
+
 **Dispatch chain.** `X-Linuxtool.sh` shows the top-level menu, downloads the
-chosen script to `/tmp`, and runs it. Several `Desktop/`/`Homelab/` scripts are
-themselves dispatchers with their own submenu (`Fedora.sh` → Fedora
-Post-Setup/Kinoite/Bazzite; `GamingTools.sh` → Proton-CachyOS/Wine/Gaming
-Setup; `Homelab/X27-Homelab.sh` → Docker Install/Auto-Update/Compose Updater),
+chosen script to `/tmp`, and runs it. Several scripts are themselves
+dispatchers with their own submenu — `Desktop/Scripts/Fedora.sh` is the
+"Desktop-Linux" hub (Fedora Post-Setup/Kinoite/Bazzite, Brave, Proton/Wine &
+Gaming, Sleep Fix, Flatpak Apps/Updates), further dispatching Proton/Wine &
+Gaming to `Desktop/Scripts/GamingTools.sh` (Proton-CachyOS/Wine/Gaming Setup);
+`Homelab/X27-Homelab.sh` → Docker Install/Auto-Update/Compose Updater —
 fetching and running the next script in the same way. Expect multi-hop
 downloads before reaching the script that actually does work.
 
