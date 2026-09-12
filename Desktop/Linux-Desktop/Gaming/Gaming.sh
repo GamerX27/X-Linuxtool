@@ -129,6 +129,35 @@ EOF
   ui_ok "Run 'proton-cachyos-update' anytime to check for and install Proton-CachyOS updates."
 }
 
+install_wine_update_command() {
+  local USERNAME USER_HOME bindir
+  USERNAME="${SUDO_USER:-$(logname 2>/dev/null || echo root)}"
+  USER_HOME="$(getent passwd "$USERNAME" | cut -d: -f6)"
+  bindir="$USER_HOME/.local/bin"
+
+  ui_info "Installing 'kron4ek-wine-update' command to ${bindir}…"
+  sudo -u "$USERNAME" mkdir -p "$bindir"
+
+  cat > "$bindir/kron4ek-wine-update" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+LOCAL_BASE="${LOCAL_BASE}"
+CODEBERG_RAW_BASE="${CODEBERG_RAW_BASE}"
+GITHUB_RAW_BASE="${GITHUB_RAW_BASE}"
+tmp="\$(mktemp -d)"
+trap 'rm -rf "\$tmp"' EXIT
+if [ -n "\$LOCAL_BASE" ] && [ -f "\$LOCAL_BASE/Kron4ek-wine-installer.sh" ]; then
+  cp "\$LOCAL_BASE/Kron4ek-wine-installer.sh" "\$tmp/Kron4ek-wine-installer.sh"
+elif ! curl -fsSL "\$CODEBERG_RAW_BASE/Kron4ek-wine-installer.sh" -o "\$tmp/Kron4ek-wine-installer.sh"; then
+  curl -fsSL "\$GITHUB_RAW_BASE/Kron4ek-wine-installer.sh" -o "\$tmp/Kron4ek-wine-installer.sh"
+fi
+bash "\$tmp/Kron4ek-wine-installer.sh"
+EOF
+  chown "$USERNAME:$USERNAME" "$bindir/kron4ek-wine-update"
+  chmod 755 "$bindir/kron4ek-wine-update"
+  ui_ok "Run 'kron4ek-wine-update' anytime to check for and install Wine Staging TkG updates."
+}
+
 run_extra_installers() {
   ensure_curl || { ui_warn "Skipping extra installers (curl unavailable)."; return 0; }
 
@@ -147,6 +176,7 @@ run_extra_installers() {
       # These installers must NOT run as root, so drop privileges.
       sudo -u "$USERNAME" -H bash "$tmpdir/$s" || ui_err "${s} exited with errors."
       [[ "$s" == "proton-cachyos-installer.sh" ]] && install_proton_update_command
+      [[ "$s" == "Kron4ek-wine-installer.sh" ]] && install_wine_update_command
     fi
   done
 
