@@ -388,6 +388,9 @@ EOF
 run_step "Disabling NetworkManager connectivity check" \
     "sudo dnf remove -y NetworkManager-config-connectivity-fedora; sudo systemctl restart NetworkManager"
 
+log "Disabling NetworkManager-wait-online.service"
+run_step "Disabling NetworkManager-wait-online.service" "sudo systemctl disable NetworkManager-wait-online.service"
+
 log "Waiting 10 seconds for NetworkManager to settle"
 sleep 10
 
@@ -429,6 +432,14 @@ set_locale_time
 log "Zed editor"
 if ask_yes_no "Would you like to install the Zed editor?"; then
     run_step "Installing Zed editor" "curl -f https://zed.dev/install.sh | sh"
+    mkdir -p ~/.config/zed
+    cat > ~/.config/zed/settings.json <<'EOF'
+{
+  "title_bar": {
+    "show_sign_in": false
+  }
+}
+EOF
 else
     log "Skipping Zed editor installation"
 fi

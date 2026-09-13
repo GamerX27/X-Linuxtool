@@ -14,43 +14,51 @@ if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ] && [ -z "${NO_COLOR:-}" ]; then
     C_RED=$'\033[31m'
     C_YELLOW=$'\033[33m'
     C_GREEN=$'\033[32m'
-    C_MAGENTA=$'\033[35m'
-    C_INVERT=$'\033[7m'
 else
     C_RESET="" C_BOLD="" C_DIM=""
-    C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_MAGENTA="" C_INVERT=""
+    C_RED="" C_GREEN="" C_YELLOW="" C_BLUE=""
 fi
+
+# Dash pool sliced down to CONTENT_W each redraw (90 = widest terminal we scale for).
+printf -v DASH_POOL '─%.0s' {1..90}
+
+calc_margin() {
+    MARGIN="" CONTENT_W=44 RULE_DASH="${DASH_POOL:0:44}"
+    [ -t 1 ] || return
+    local cols
+    cols="$(tput cols 2>/dev/null)"
+    [ -z "$cols" ] && cols="${COLUMNS:-80}"
+    CONTENT_W=$(( cols * 40 / 100 ))
+    [ "$CONTENT_W" -lt 44 ] && CONTENT_W=44
+    [ "$CONTENT_W" -gt 90 ] && CONTENT_W=90
+    RULE_DASH="${DASH_POOL:0:$CONTENT_W}"
+    local pad=$(( (cols - CONTENT_W) / 2 ))
+    [ "$pad" -lt 0 ] && pad=0
+    printf -v MARGIN '%*s' "$pad" ''
+}
 
 ui_info()    { printf '%s  ›%s %s\n'   "$C_BLUE"   "$C_RESET" "$1"; }
 ui_ok()      { printf '%s  ✔%s %s\n'   "$C_GREEN"  "$C_RESET" "$1"; }
 ui_warn()    { printf '%s  ▲%s %s\n'   "$C_YELLOW" "$C_RESET" "$1"; }
 ui_err()     { printf '%s  ✖%s %s\n'   "$C_RED"    "$C_RESET" "$1" >&2; }
-ui_step()    { printf '\n%s  ➤ %s%s\n' "$C_MAGENTA$C_BOLD" "$1" "$C_RESET"; }
-ui_rule()    { printf '%s──────────────────────────────────────────────────────%s\n' "$C_DIM" "$C_RESET"; }
+ui_step() {
+    calc_margin
+    printf '\n%s%s%s%s%s\n' "$MARGIN" "$C_BOLD" "$C_RED" "$1" "$C_RESET"
+    printf '%s%s%s%s\n' "$MARGIN" "$C_DIM" "$RULE_DASH" "$C_RESET"
+}
+ui_rule()    { calc_margin; printf '%s%s%s%s\n' "$MARGIN" "$C_DIM" "$RULE_DASH" "$C_RESET"; }
 
 ui_menu_item() {
-    # ui_menu_item <number> <label>
-    printf '   %s%s)%s %s%s%s\n' \
-        "$C_BOLD" "$1" "$C_RESET" \
+    calc_margin
+    printf '%s   %s%s)%s %s%s%s\n' \
+        "$MARGIN" "$C_BOLD" "$1" "$C_RESET" \
         "$C_BOLD" "$2" "$C_RESET"
 }
 
-ui_section() { printf '\n %s%s%s\n' "$C_DIM" "$1" "$C_RESET"; }
+ui_section() { calc_margin; printf '\n%s %s%s%s\n' "$MARGIN" "$C_DIM" "$1" "$C_RESET"; }
 
 ui_pick() {
-    # ui_pick <title> <item1> <item2> ... ; entries prefixed with $'\x01'
-    # start a new category (its text is the category name); items following
-    # it belong to that category until the next $'\x01' entry. With
-    # categories: Up/Down + Enter first browse the category list, Enter
-    # drills into one, "← Back" (or Esc) returns to the category list;
-    # typing at any point switches to a flat search across every item
-    # (shown with its category tag), Enter on a match runs it directly. With
-    # no categories, it's a single flat Up/Down + Enter + type-to-search
-    # list. On success sets PICK_INDEX (0-based, counting only selectable
-    # entries, in input order) and returns 0. Returns 1 if the user
-    # cancelled (Esc at the top level), or 2 if there's no real terminal to
-    # run the picker on (caller should fall back to a plain numbered
-    # prompt).
+    # ui_pick <title> <item...>; $'\x01'-prefixed items start a category. Sets PICK_INDEX, returns 0/1/2 (pick/cancel/no-tty).
     local title="$1"
     shift
     local -a raw=("$@")
@@ -82,7 +90,7 @@ ui_pick() {
     { stty -echo -icanon min 1 time 0 < "$INPUT"; } 2>/dev/null
     trap '{ stty "$old_stty" < "$INPUT"; } 2>/dev/null; printf "\n"; exit 130' INT
 
-    local filter="" selected=0 key rest k c needle entry n result=1 plain
+    local filter="" selected=0 key rest k c needle entry n result=1
     local view="cats"
     [ "$has_categories" -eq 0 ] && view="items"
     local current_cat=0 back_row=0
@@ -160,26 +168,24 @@ ui_pick() {
                 ;;
             search) ui_step "$title — search" ;;
         esac
-        printf '%s  Search:%s %s\n\n' "$C_BOLD" "$C_RESET" "$filter"
+        printf '%s%s  Search:%s %s\n\n' "$MARGIN" "$C_BOLD" "$C_RESET" "$filter"
 
         if [ "$n" -eq 0 ]; then
-            printf '%s  (no matches)%s\n' "$C_DIM" "$C_RESET"
+            printf '%s  %s(no matches)%s\n' "$MARGIN" "$C_DIM" "$C_RESET"
         else
             for i in "${!nav_labels[@]}"; do
-                if [ "$i" -eq "$selected" ]; then
-                    if [ "$view" = "search" ]; then
-                        printf '  %s❯%s %s\n' "$C_INVERT" "$C_RESET" "${nav_labels[$i]}"
-                    else
-                        printf -v plain '%-40s' "${nav_labels[$i]}"
-                        printf '  %s%s%s\n' "$C_INVERT" "$plain" "$C_RESET"
-                    fi
+                if [ "$i" -ne "$selected" ]; then
+                    printf '%s    %s\n' "$MARGIN" "${nav_labels[$i]}"
                 else
-                    printf '    %s\n' "${nav_labels[$i]}"
+                    # Re-apply the highlight color after any reset embedded
+                    # in the label (e.g. a search-view category tag), so the
+                    # whole selected row stays blue.
+                    printf '%s  %s%s❯ %s%s\n' "$MARGIN" "$C_BOLD" "$C_BLUE" "${nav_labels[$i]//$C_RESET/$C_RESET$C_BOLD$C_BLUE}" "$C_RESET"
                 fi
             done
         fi
 
-        printf '\n%s  ↑/↓ move · Enter select · Esc back · type to search%s\n' "$C_DIM" "$C_RESET"
+        printf '\n%s%s  ↑/↓ move · Enter select · Esc back · type to search%s\n' "$MARGIN" "$C_DIM" "$C_RESET"
 
         IFS= read -rsn1 key < "$INPUT" || { result=1; break; }
         case "$key" in

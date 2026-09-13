@@ -58,6 +58,18 @@ script must keep working when piped directly via `curl | bash` on its own, so
 it can't depend on other files existing on disk. Don't "DRY up" this
 duplication across files.
 
+**Menu/picker look.** The UI is borderless and horizontally centered, but
+top-anchored (not vertically centered) — it starts at the top of the screen
+on every redraw, not the vertical middle. Every `ui_step`/`ui_banner`/
+`ui_pick` line is prefixed with a `MARGIN` of spaces computed by a per-file
+`calc_margin` (from `tput cols`, falling back to `$COLUMNS` then 80) against
+a fixed `CONTENT_W` anchor, so the whole block sits horizontally centered
+and re-centers on every redraw if the terminal is resized. When stdout
+isn't a real tty, `MARGIN` is empty. `ui_pick`'s selected row is marked with
+a colored `❯` prefix (not a full-row invert), which is why search-view rows
+can safely embed their own category-tag color reset without clipping a
+highlight.
+
 **Interactive input under `curl | bash`.** When a script is piped into bash,
 stdin is consumed by the pipe itself. Menu/dispatcher scripts work around this
 with an `INPUT` variable that prefers `/dev/tty` (falling back to
