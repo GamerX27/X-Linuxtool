@@ -11,7 +11,7 @@ The Desktop and HomeLab toolboxes used to live in their own repos
 this repo (full history preserved) so everything ships from one place:
 
 - `Desktop/` — desktop setup scripts: dispatchers in `Desktop/Scripts/`
-  (`Fedora.sh`, `GamingTools.sh`), leaf scripts by category in
+  (`Desktop-Linux.sh`, `GamingTools.sh`), leaf scripts by category in
   `Desktop/Linux-Desktop/` (Fedora, Bazzite, Gaming, Flatpak, Browser)
 - `Homelab/` — server / homelab scripts (Docker, updates)
 - `Tools/` — shared utilities (Fastfetch, Sleep Fix, Virtualization)
@@ -51,7 +51,7 @@ chmod +x X-Linuxtool.sh
 
 | # | Option | Description |
 |---|--------|-------------|
-| 1 | Desktop-Linux | Opens a submenu (`Desktop/Scripts/Fedora.sh`) — see below |
+| 1 | Desktop-Linux | Opens a submenu (`Desktop/Scripts/Desktop-Linux.sh`) — see below |
 | 2 | HomeLab | HomeLab setup script (`Homelab/X27-Homelab.sh`) |
 | 3 | YT-DLP | Install the YT-DLP-Easy script |
 | 4 | Fastfetch | Apply a custom Fastfetch configuration |

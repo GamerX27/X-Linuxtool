@@ -23,17 +23,17 @@ chain.
 
 **Layout.** Each domain (`Desktop/`, `Homelab/`) keeps its dispatcher scripts
 under a `Scripts/` subdirectory and its leaf/worker scripts grouped by
-category one level below that: `Desktop/Scripts/` (`Fedora.sh`,
+category one level below that: `Desktop/Scripts/` (`Desktop-Linux.sh`,
 `GamingTools.sh`) dispatches into `Desktop/Linux-Desktop/<category>/`
 (`Fedora/`, `Bazzite/`, `Browser/`, `Flatpak/`, `Gaming/`); `Homelab/Scripts/`
 dispatches into itself (`Docker/`, `Server-Updater.sh`) from the domain-root
 entrypoint `Homelab/X27-Homelab.sh`. A shared top-level `Tools/` (Fastfetch,
 Sleep Fix, Virtualization) sits outside both domains, fetched directly by
-`X-Linuxtool.sh` or by `Fedora.sh`.
+`X-Linuxtool.sh` or by `Desktop-Linux.sh`.
 
 **Dispatch chain.** `X-Linuxtool.sh` shows the top-level menu, downloads the
 chosen script to `/tmp`, and runs it. Several scripts are themselves
-dispatchers with their own submenu — `Desktop/Scripts/Fedora.sh` is the
+dispatchers with their own submenu — `Desktop/Scripts/Desktop-Linux.sh` is the
 "Desktop-Linux" hub (Fedora Post-Setup/Kinoite/Bazzite, Brave, Proton/Wine &
 Gaming, Sleep Fix, Flatpak Apps/Updates), further dispatching Proton/Wine &
 Gaming to `Desktop/Scripts/GamingTools.sh` (Proton-CachyOS/Wine/Gaming Setup);

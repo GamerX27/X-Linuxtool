@@ -169,7 +169,7 @@ log "Detected Fedora ${FEDORA_VERSION}"
 log "This will take a while — sit back and let it run."
 
 log "Refreshing metadata and upgrading the system"
-run_step "Refreshing metadata" "sudo dnf update --refresh -y" \
+run_step "Refreshing metadata" "sudo dnf makecache --refresh -y" \
     && run_step "Upgrading system packages" "sudo dnf upgrade -y"
 
 log "Enabling RPM Fusion (free + nonfree) repositories"

@@ -364,14 +364,14 @@ say_goodbye_and_exit() {
 
 run_desktop_linux_hop() {
     ui_step "Desktop-Linux"
-    # Run as the normal user (NOT with sudo): Fedora.sh dispatches to
+    # Run as the normal user (NOT with sudo): Desktop-Linux.sh dispatches to
     # per-option sub-scripts that each handle privilege escalation
     # themselves as needed (Fedora-PostSetup.sh requests sudo internally
     # for its per-user steps; most other sub-scripts are invoked by
-    # Fedora.sh with sudo directly).
-    fetch_file "${CB_TOOLBOX}/Scripts/Fedora.sh" "${GH_TOOLBOX}/Scripts/Fedora.sh" /tmp/Fedora.sh "Desktop/Scripts/Fedora.sh" || exit 1
-    bash /tmp/Fedora.sh < "$INPUT" > "$OUTPUT"
-    rm -f /tmp/Fedora.sh
+    # Desktop-Linux.sh with sudo directly).
+    fetch_file "${CB_TOOLBOX}/Scripts/Desktop-Linux.sh" "${GH_TOOLBOX}/Scripts/Desktop-Linux.sh" /tmp/Desktop-Linux.sh "Desktop/Scripts/Desktop-Linux.sh" || exit 1
+    bash /tmp/Desktop-Linux.sh < "$INPUT" > "$OUTPUT"
+    rm -f /tmp/Desktop-Linux.sh
 }
 
 run_homelab_hop() {
