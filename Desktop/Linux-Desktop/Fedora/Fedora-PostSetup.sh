@@ -398,9 +398,7 @@ log "Installing the Brave browser (origin flavor)"
 run_step "Installing Brave browser" "curl -fsS https://dl.brave.com/install.sh | FLAVOR=origin sh"
 
 log "Setting Brave as the default web browser"
-xdg-settings set default-web-browser brave-origin.desktop \
-    && ok "Brave set as the default web browser." \
-    || warn "Failed to set Brave as the default web browser (continuing)."
+run_step "Setting Brave as the default web browser" "xdg-settings set default-web-browser brave-origin.desktop"
 
 log "Applying Brave policy configuration"
 BRAVE_POLICY_SCRIPT="$(mktemp /tmp/make_brave_great_again.XXXXXX.sh)"
