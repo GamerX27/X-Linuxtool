@@ -26,7 +26,7 @@ calc_margin() {
     MARGIN="" CONTENT_W=44 RULE_DASH="${DASH_POOL:0:44}"
     [ -t 1 ] || return
     local cols
-    cols="$(tput cols 2>/dev/null)"
+    cols="$(tput cols 2>/dev/null </dev/tty)"
     [ -z "$cols" ] && cols="${COLUMNS:-80}"
     CONTENT_W=$(( cols * 40 / 100 ))
     [ "$CONTENT_W" -lt 44 ] && CONTENT_W=44
